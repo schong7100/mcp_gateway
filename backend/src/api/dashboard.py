@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -24,23 +24,14 @@ async def dashboard_stats(
     )
     total_today = total_result.scalar_one()
 
-    # 오늘 필터링 건수 (응답 마스킹)
-    filtered_result = await db.execute(
+    # 오늘 마스킹 건수 (요청+응답 통합 — filtered=True)
+    masked_result = await db.execute(
         select(func.count(SearchLog.id)).where(
             SearchLog.created_at >= today_start,
             SearchLog.filtered.is_(True),
         )
     )
-    filtered_today = filtered_result.scalar_one()
-
-    # 오늘 차단 건수 (요청 차단)
-    blocked_result = await db.execute(
-        select(func.count(SearchLog.id)).where(
-            SearchLog.created_at >= today_start,
-            SearchLog.response_status == 403,
-        )
-    )
-    blocked_today = blocked_result.scalar_one()
+    masked_today = masked_result.scalar_one()
 
     # 활성 필터 규칙 수
     active_rules_result = await db.execute(
@@ -56,10 +47,27 @@ async def dashboard_stats(
     )
     service_breakdown = {row[0]: row[1] for row in service_result.all()}
 
+    # 최근 24시간 시간별 트렌드
+    hours_24_ago = datetime.now(tz=UTC) - timedelta(hours=24)
+    hour_trunc = func.date_trunc("hour", SearchLog.created_at)
+    hourly_result = await db.execute(
+        select(
+            hour_trunc.label("hour"),
+            func.count(SearchLog.id).label("count"),
+        )
+        .where(SearchLog.created_at >= hours_24_ago)
+        .group_by(hour_trunc)
+        .order_by(hour_trunc)
+    )
+    hourly_trend = [
+        {"hour": row.hour.strftime("%H:00"), "count": row.count}
+        for row in hourly_result.all()
+    ]
+
     return {
         "total_today": total_today,
-        "filtered_today": filtered_today,
-        "blocked_today": blocked_today,
+        "masked_today": masked_today,
         "active_rules": active_rules,
         "service_breakdown": service_breakdown,
+        "hourly_trend": hourly_trend,
     }

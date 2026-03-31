@@ -186,12 +186,17 @@ export function updateUser(
 }
 
 // Dashboard
+export interface HourlyTrend {
+  hour: string;
+  count: number;
+}
+
 export interface DashboardStats {
   total_today: number;
-  filtered_today: number;
-  blocked_today: number;
+  masked_today: number;
   active_rules: number;
   service_breakdown: Record<string, number>;
+  hourly_trend: HourlyTrend[];
 }
 
 export function fetchDashboardStats(token: string): Promise<DashboardStats> {

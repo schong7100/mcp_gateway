@@ -49,11 +49,13 @@ async def get_current_user(request: Request) -> CurrentUser:
         )
 
     # Proxy API key 인증 (MCP stdio 서버용 — X-API-Key 또는 Bearer token)
+    # 개발자는 Keycloak 계정 없이 IP 기반으로 식별
+    client_ip = (request.client.host if request.client else "unknown")
     api_key = request.headers.get("x-api-key", "")
     if api_key and settings.proxy_api_key and api_key == settings.proxy_api_key:
         return CurrentUser(
-            user_id="mcp-service",
-            username=request.headers.get("x-mcp-user", "mcp-client"),
+            user_id=f"ip:{client_ip}",
+            username=client_ip,
             email=None,
             roles=["viewer"],
         )
@@ -63,8 +65,8 @@ async def get_current_user(request: Request) -> CurrentUser:
         bearer_value = auth_header[7:]
         if bearer_value == settings.proxy_api_key:
             return CurrentUser(
-                user_id="mcp-service",
-                username=request.headers.get("x-mcp-user", "mcp-client"),
+                user_id=f"ip:{client_ip}",
+                username=client_ip,
                 email=None,
                 roles=["viewer"],
             )
