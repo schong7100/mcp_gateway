@@ -2,18 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { fetchDashboardStats, DashboardStats } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 export default function DashboardPage() {
+  const { token, isLoading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchDashboardStats('')
+    if (authLoading) return;
+    fetchDashboardStats(token)
       .then(setStats)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [token, authLoading]);
 
   return (
     <div>

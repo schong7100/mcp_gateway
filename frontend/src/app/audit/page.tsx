@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { fetchAuditTrail, AuditTrailEntry, AuditTrailList } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 const ACTION_LABELS: Record<string, string> = {
   search: '검색',
@@ -12,6 +13,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export default function AuditPage() {
+  const { token, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<AuditTrailList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function AuditPage() {
   function load(actionVal: string, userIdVal: string, pageVal: number) {
     setLoading(true);
     setError(null);
-    fetchAuditTrail('', {
+    fetchAuditTrail(token, {
       page: pageVal,
       action: actionVal || undefined,
       user_id: userIdVal || undefined,
@@ -35,9 +37,10 @@ export default function AuditPage() {
   }
 
   useEffect(() => {
+    if (authLoading) return;
     load(action, userId, page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action, page]);
+  }, [token, authLoading, action, page]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();

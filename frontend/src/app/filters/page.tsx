@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchFilters, createFilter, updateFilter, deleteFilter, FilterRule } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 const DIRECTION_LABELS: Record<string, string> = {
   request: '요청',
@@ -16,6 +17,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function FiltersPage() {
+  const { token, isAdmin, isLoading: authLoading } = useAuth();
   const [rules, setRules] = useState<FilterRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +36,7 @@ export default function FiltersPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchFilters('');
-      setRules(data);
+      setRules(await fetchFilters(token));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '오류 발생');
     } finally {
@@ -44,12 +45,14 @@ export default function FiltersPage() {
   }
 
   useEffect(() => {
+    if (authLoading) return;
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, authLoading]);
 
   async function handleToggle(rule: FilterRule) {
     try {
-      const updated = await updateFilter('', rule.id, { enabled: !rule.enabled });
+      const updated = await updateFilter(token, rule.id, { enabled: !rule.enabled });
       setRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '업데이트 실패');
@@ -59,7 +62,7 @@ export default function FiltersPage() {
   async function handleDelete(id: string) {
     if (!confirm('이 규칙을 삭제하시겠습니까?')) return;
     try {
-      await deleteFilter('', id);
+      await deleteFilter(token, id);
       setRules((prev) => prev.filter((r) => r.id !== id));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '삭제 실패');
@@ -71,7 +74,7 @@ export default function FiltersPage() {
     setSaving(true);
     setError(null);
     try {
-      const created = await createFilter('', newRule);
+      const created = await createFilter(token, newRule);
       setRules((prev) => [...prev, created]);
       setShowAddForm(false);
       setNewRule({ name: '', rule_type: 'regex', pattern: '', service: 'all', direction: 'both', description: '' });
@@ -86,12 +89,14 @@ export default function FiltersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">필터 규칙 관리</h1>
-        <button
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
-          onClick={() => setShowAddForm((v) => !v)}
-        >
-          {showAddForm ? '취소' : '+ 새 규칙'}
-        </button>
+        {isAdmin && (
+          <button
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+            onClick={() => setShowAddForm((v) => !v)}
+          >
+            {showAddForm ? '취소' : '+ 새 규칙'}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -100,7 +105,7 @@ export default function FiltersPage() {
         </div>
       )}
 
-      {showAddForm && (
+      {showAddForm && isAdmin && (
         <form onSubmit={handleCreate} className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">새 필터 규칙 추가</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -196,13 +201,13 @@ export default function FiltersPage() {
               <th className="px-6 py-3 text-left font-medium text-gray-500">서비스</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">방향</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">상태</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500">작업</th>
+              {isAdmin && <th className="px-6 py-3 text-left font-medium text-gray-500">작업</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td className="px-6 py-8 text-center text-gray-400" colSpan={7}>
+                <td className="px-6 py-8 text-center text-gray-400" colSpan={isAdmin ? 7 : 6}>
                   로딩 중...
                 </td>
               </tr>
@@ -236,30 +241,40 @@ export default function FiltersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-3">
-                    <button
-                      onClick={() => handleToggle(rule)}
-                      className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${
-                        rule.enabled
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
-                      {rule.enabled ? '활성' : '비활성'}
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        onClick={() => handleToggle(rule)}
+                        className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${
+                          rule.enabled
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}
+                      >
+                        {rule.enabled ? '활성' : '비활성'}
+                      </button>
+                    ) : (
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        rule.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {rule.enabled ? '활성' : '비활성'}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-6 py-3">
-                    <button
-                      onClick={() => handleDelete(rule.id)}
-                      className="text-red-500 hover:text-red-700 text-xs"
-                    >
-                      삭제
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-6 py-3">
+                      <button
+                        onClick={() => handleDelete(rule.id)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        삭제
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="px-6 py-8 text-center text-gray-400" colSpan={7}>
+                <td className="px-6 py-8 text-center text-gray-400" colSpan={isAdmin ? 7 : 6}>
                   필터 규칙이 없습니다.
                 </td>
               </tr>

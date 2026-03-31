@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { fetchLogs, SearchLog, SearchLogList } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 export default function LogsPage() {
+  const { token, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<SearchLogList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -12,13 +14,14 @@ export default function LogsPage() {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
+    if (authLoading) return;
     setLoading(true);
     setError(null);
-    fetchLogs('', { page, service: service || undefined, filtered_only: filteredOnly || undefined })
+    fetchLogs(token, { page, service: service || undefined, filtered_only: filteredOnly || undefined })
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [page, service, filteredOnly]);
+  }, [token, authLoading, page, service, filteredOnly]);
 
   function handleServiceChange(e: React.ChangeEvent<HTMLSelectElement>) {
     setService(e.target.value);
@@ -99,13 +102,11 @@ export default function LogsPage() {
                     {log.method} {log.path}
                   </td>
                   <td className="px-6 py-3">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        log.response_status >= 400
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-green-100 text-green-700'
-                      }`}
-                    >
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      log.response_status >= 400
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}>
                       {log.response_status}
                     </span>
                   </td>
@@ -139,9 +140,7 @@ export default function LogsPage() {
             >
               이전
             </button>
-            <span className="text-sm text-gray-500">
-              {page} / {totalPages}
-            </span>
+            <span className="text-sm text-gray-500">{page} / {totalPages}</span>
             <button
               className="text-sm px-3 py-1 border rounded disabled:opacity-40"
               onClick={() => setPage((p) => p + 1)}

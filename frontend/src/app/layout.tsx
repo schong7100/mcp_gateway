@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { KeycloakProvider } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import "./globals.css";
 
@@ -11,8 +12,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body className="bg-gray-50 text-gray-900 min-h-screen">
-        <Nav />
-        <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+        <KeycloakProvider>
+          <Nav />
+          <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+        </KeycloakProvider>
       </body>
     </html>
   );
