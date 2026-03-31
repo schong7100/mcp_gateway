@@ -1,4 +1,5 @@
 import json
+from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,25 @@ from src.gateway.filter import content_filter
 from src.gateway.proxy import forward_request
 
 router = APIRouter(prefix="/proxy", tags=["proxy"])
+
+
+def _parse_request_body(body: bytes, query_string: str | None) -> dict | None:
+    """요청 본문과 query string을 로그용 JSON으로 변환합니다."""
+    result: dict = {}
+
+    # Query string → dict (GET 요청의 검색어 등)
+    if query_string:
+        params = parse_qs(query_string)
+        result["query_params"] = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+
+    # POST body
+    if body:
+        try:
+            result["body"] = json.loads(body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            result["body_length"] = len(body)
+
+    return result if result else None
 
 
 async def _handle_proxy(
@@ -50,11 +70,7 @@ async def _handle_proxy(
                 }
 
                 # 차단 로그 저장
-                request_body_json = None
-                try:
-                    request_body_json = json.loads(body)
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    request_body_json = {"raw_length": len(body)}
+                request_body_json = _parse_request_body(body, request.url.query)
 
                 log = SearchLog(
                     user_id=user.user_id,
@@ -129,12 +145,7 @@ async def _handle_proxy(
                 response_body = response_text.encode("utf-8")
 
     # 검색 로그 저장
-    request_body_json = None
-    if body:
-        try:
-            request_body_json = json.loads(body)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            request_body_json = {"raw_length": len(body)}
+    request_body_json = _parse_request_body(body, request.url.query)
 
     response_body_json = None
     try:

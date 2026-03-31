@@ -4,6 +4,37 @@ import { useEffect, useState } from 'react';
 import { fetchLogs, SearchLog, SearchLogList } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
+interface FilterMatch {
+  rule_name: string;
+  rule_type: string;
+  matched_text: string;
+}
+
+function extractQuery(log: SearchLog): string | null {
+  const rb = log.request_body as Record<string, unknown> | null;
+  if (!rb) return null;
+
+  // query_params.query (GET 요청)
+  const qp = rb.query_params as Record<string, string> | undefined;
+  if (qp?.query) return qp.query;
+
+  // body.query (POST 요청)
+  const body = rb.body as Record<string, string> | undefined;
+  if (body?.query) return body.query;
+
+  // legacy: 직접 body에 query
+  if (typeof rb.query === 'string') return rb.query;
+
+  return null;
+}
+
+function extractFilterMatches(log: SearchLog): FilterMatch[] {
+  const fd = log.filter_details as Record<string, unknown> | null;
+  if (!fd) return [];
+  const matches = fd.matches as FilterMatch[] | undefined;
+  return matches ?? [];
+}
+
 export default function LogsPage() {
   const { token, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<SearchLogList | null>(null);
@@ -12,6 +43,7 @@ export default function LogsPage() {
   const [service, setService] = useState('');
   const [filteredOnly, setFilteredOnly] = useState(false);
   const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -78,7 +110,7 @@ export default function LogsPage() {
               <th className="px-6 py-3 text-left font-medium text-gray-500">시간</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">사용자</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">서비스</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500">경로</th>
+              <th className="px-6 py-3 text-left font-medium text-gray-500">검색 내용</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">상태</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">필터</th>
             </tr>
@@ -91,36 +123,76 @@ export default function LogsPage() {
                 </td>
               </tr>
             ) : data && data.items.length > 0 ? (
-              data.items.map((log: SearchLog) => (
-                <tr key={log.id} className={log.filtered ? 'bg-red-50' : ''}>
-                  <td className="px-6 py-3 text-gray-600 whitespace-nowrap">
-                    {new Date(log.created_at).toLocaleString('ko-KR')}
-                  </td>
-                  <td className="px-6 py-3">{log.user_name}</td>
-                  <td className="px-6 py-3 capitalize">{log.service}</td>
-                  <td className="px-6 py-3 font-mono text-xs text-gray-600 max-w-xs truncate">
-                    {log.method} {log.path}
-                  </td>
-                  <td className="px-6 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      log.response_status >= 400
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}>
-                      {log.response_status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3">
-                    {log.filtered ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                        차단됨
+              data.items.map((log: SearchLog) => {
+                const query = extractQuery(log);
+                const matches = extractFilterMatches(log);
+                const isExpanded = expandedId === log.id;
+
+                return (
+                  <tr
+                    key={log.id}
+                    className={`${log.filtered ? 'bg-red-50' : ''} cursor-pointer hover:bg-gray-50`}
+                    onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                  >
+                    <td className="px-6 py-3 text-gray-600 whitespace-nowrap align-top">
+                      {new Date(log.created_at).toLocaleString('ko-KR')}
+                    </td>
+                    <td className="px-6 py-3 align-top">{log.user_name}</td>
+                    <td className="px-6 py-3 capitalize align-top">{log.service}</td>
+                    <td className="px-6 py-3 align-top max-w-md">
+                      {query ? (
+                        <div>
+                          <p className={`text-sm ${log.filtered ? 'text-red-700' : 'text-gray-800'}`}>
+                            {query}
+                          </p>
+                          {isExpanded && (
+                            <p className="mt-1 font-mono text-xs text-gray-400">
+                              {log.method} /{log.path}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="font-mono text-xs text-gray-500">
+                          {log.method} /{log.path}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 align-top">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        log.response_status >= 400
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {log.response_status}
                       </span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-6 py-3 align-top">
+                      {log.filtered && matches.length > 0 ? (
+                        <div className="space-y-1">
+                          {matches.map((m, i) => (
+                            <div key={i} className="flex items-start gap-1">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
+                                {m.rule_name}
+                              </span>
+                              {isExpanded && (
+                                <span className="text-xs text-red-500 font-mono break-all">
+                                  &quot;{m.matched_text}&quot;
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : log.filtered ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                          차단됨
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td className="px-6 py-8 text-center text-gray-400" colSpan={6}>
