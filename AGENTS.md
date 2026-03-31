@@ -17,7 +17,7 @@ implementation costs minutes more than the shortcut — do the complete thing. E
 Before building anything involving unfamiliar patterns, infrastructure, or runtime capabilities:
 1. Search for "{runtime} {thing} built-in"
 2. Search for "{thing} best practice {current year}"
-3. Check official runtime/framework docs (MCP SDK, FastAPI, SQLAlchemy, Next.js, Keycloak)
+3. Check official runtime/framework docs (FastAPI, httpx, SQLAlchemy, Next.js, Keycloak)
 
 **Three Layers of Knowledge:**
 - **Layer 1: Tried and true** — standard patterns, battle-tested. Verify, don't assume.
@@ -71,8 +71,8 @@ Two-pass review against the diff:
 **Pass 1 (CRITICAL):**
 - SQL & Data Safety (injection, missing WHERE clauses)
 - Race Conditions & Concurrency (async handlers, DB transactions)
-- Auth/Security boundary violations (Keycloak JWT, plugin API keys)
-- Missing error handling on external calls (Context7, Exa, Keycloak JWKS)
+- Auth/Security boundary violations (Keycloak JWT, API keys in env vars)
+- Missing error handling on external calls (upstream proxy, Keycloak JWKS)
 
 **Pass 2 (INFORMATIONAL):**
 - Dead code & consistency
@@ -87,7 +87,7 @@ Two-pass review against the diff:
 ### /test — Verification
 - All tests pass
 - New code has test coverage
-- Integration points verified (plugin stubs, API endpoints)
+- Integration points verified (proxy endpoints, filter engine, API endpoints)
 - Build succeeds (`pip install -e ".[dev]"`, `npm run build`)
 
 ### /ship — Release
@@ -108,11 +108,18 @@ After shipping, ask:
 ## Project-Specific Conventions
 
 ### Tech Stack
-- **Backend**: Python 3.11+ / FastAPI / MCP Python SDK
-- **Frontend**: Next.js 15 / React 19 / TypeScript
+- **Backend**: Python 3.11+ / FastAPI / httpx (reverse proxy)
+- **Frontend**: Next.js 15 / React 19 / TypeScript / Tailwind CSS v4
 - **Database**: PostgreSQL 15 / SQLAlchemy 2.0 (async) / Alembic
-- **Auth**: Keycloak (OCP SSO via Identity Broker)
+- **Auth**: Keycloak (standalone IDP — no OCP integration)
 - **Deployment**: Podman on RHEL VM (UBI9 base images)
+
+### Architecture Overview
+MCP Gateway is an **HTTP Reverse Proxy** (URL Redirect approach). No MCP SDK on the gateway.
+- Developer PCs run `context7-mcp` and `exa-mcp-server` as stdio MCP servers
+- API URLs are redirected to Gateway via environment variables (`CONTEXT7_API_URL`, `EXA_BASE_URL`)
+- Gateway forwards requests to upstream (context7.com, api.exa.ai) with bidirectional content filtering
+- All requests/responses are logged to PostgreSQL for security monitoring
 
 ### Code Standards
 
@@ -141,143 +148,148 @@ After shipping, ask:
 ```
 backend/src/
 ├── api/           # REST API endpoints (thin controllers)
+│   ├── proxy.py   #   /proxy/c7/*, /proxy/exa/* — reverse proxy
+│   ├── logs.py    #   /api/v1/logs — search log queries
+│   ├── filters.py #   /api/v1/filters — filter rule CRUD
+│   ├── audit.py   #   /api/v1/audit — audit trail queries
+│   ├── users.py   #   /api/v1/users — Keycloak user management proxy
+│   └── deps.py    #   Auth middleware, DB session dependencies
 ├── db/            # Models + migrations (data layer)
-├── gateway/       # MCP core logic (router, filter)
-├── plugins/       # Plugin implementations (Context7, Exa)
+├── gateway/       # Core proxy + filter logic
+│   ├── proxy.py   #   httpx reverse proxy to upstream APIs
+│   └── filter.py  #   Bidirectional content filter engine
 └── schemas/       # Pydantic request/response schemas
 
 frontend/src/
 ├── app/           # Next.js pages (App Router)
+│   ├── page.tsx           # Dashboard
+│   ├── logs/page.tsx      # Search logs
+│   ├── filters/page.tsx   # Filter rule management
+│   ├── audit/page.tsx     # Audit trail
+│   └── users/page.tsx     # User management
 ├── components/    # Shared UI components
 └── lib/           # Utilities (API client, Keycloak)
+
+architecture/      # Architecture documentation + Stitch diagrams
+deploy/            # Podman Compose + Containerfiles
+docs/              # Developer setup guides
 ```
 
 ### Naming Conventions
 - Python: snake_case for everything
 - TypeScript: camelCase for variables/functions, PascalCase for components/types
-- DB tables: snake_case, plural (`search_logs`, `filter_rules`)
-- API routes: kebab-case (`/api/v1/search/logs`)
+- DB tables: snake_case, plural (`search_logs`, `filter_rules`, `audit_trail`)
+- API routes: `/api/v1/{resource}` (RESTful), `/proxy/{service}/{path}` (reverse proxy)
 - Commits: conventional commits (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`)
 
 ### Security Boundaries
 - All API endpoints require Keycloak JWT (except `/health`)
-- Plugin API keys stored in environment variables, never in code
+- Keycloak is a **standalone IDP** (no OCP integration) — users managed via Admin REST API
+- Keycloak roles: `admin` (full access), `viewer` (read-only logs/audit)
+- Exa API key stored in environment variable, never in code
 - Proxy settings via env vars (`HTTP_PROXY`, `HTTPS_PROXY`)
-- Content filter rules managed by security team via UI
-- Audit trail for all search operations and filter changes
+- **Bidirectional content filtering**:
+  - Request filter: blocks requests containing sensitive patterns (→ 403)
+  - Response filter: masks sensitive content with `[REDACTED]` before returning
+- Filter rules managed by security officers via Frontend UI (CRUD)
+- Audit trail for all operations (search, filter changes, user actions)
+- Firewall: outbound-only to context7.com and api.exa.ai (no inbound)
 
 ### Testing Strategy
-- Backend: pytest + pytest-asyncio
+- Backend: pytest + pytest-asyncio + pytest-httpx
 - Frontend: (to be decided — likely Vitest)
 - Integration: test against real PostgreSQL (no mocks for DB)
-- Plugin tests: mock external APIs (Context7, Exa)
+- Proxy tests: mock upstream APIs with pytest-httpx (Context7, Exa)
+- Filter tests: unit tests with fake rule objects (no DB required)
 
 ---
 
 ## Diagrams
 
+> Full Mermaid diagrams: see `architecture/` directory
+> Stitch visual diagrams: https://stitch.withgoogle.com/project/16167240815562342620
+
 ### System Architecture
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Internal Network                       │
-│                                                           │
-│  ┌──────────┐    ┌──────────────────────────────────┐    │
-│  │ Frontend  │◄──►│         MCP Gateway (FastAPI)    │    │
-│  │ Next.js   │    │  ┌────────────┐ ┌─────────────┐  │    │
-│  │ :3000     │    │  │ MCP Router │ │Content Filter│  │    │
-│  └────┬─────┘    │  └──────┬─────┘ └──────┬──────┘  │    │
-│       │          │         │               │          │    │
-│       │          │  ┌──────┴───────────────┴──────┐  │    │
-│       │          │  │      Plugin Manager          │  │    │
-│       │          │  │  ┌─────────┐ ┌───────────┐  │  │    │
-│       │          │  │  │Context7 │ │ exa_search│  │  │    │
-│       │          │  │  │ MCP CLI │ │ HTTP API  │  │  │    │
-│       │          │  │  └────┬────┘ └─────┬─────┘  │  │    │
-│  ┌────┴─────┐   │  └───────┼─────────────┼───────┘  │    │
-│  │Keycloak  │   │  :8000   │             │           │    │
-│  │  (OCP)   │   └──────────┼─────────────┼──────────┘    │
-│  └──────────┘    ──────────┼─────────────┼───── Firewall  │
-│                            │ (outbound)  │                │
-│  ┌──────────┐              │             │                │
-│  │PostgreSQL│              │             │                │
-│  │  :5432   │              │             │                │
-│  └──────────┘              │             │                │
-└────────────────────────────┼─────────────┼────────────────┘
-                             ▼             ▼
-                      ┌──────────┐  ┌──────────┐
-                      │Context7  │  │  Exa AI  │
-                      │  Server  │  │  API     │
-                      └──────────┘  └──────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  개발자 PC (Windows 11, 폐쇄망)                                │
+│                                                                │
+│  opencode ──► context7-mcp (stdio)                            │
+│               CONTEXT7_API_URL → http://gateway:8000/proxy/c7 │
+│  opencode ──► exa-mcp-server (stdio)                          │
+│               EXA_BASE_URL → http://gateway:8000/proxy/exa    │
+└──────────────────────┬────────────────────────────────────────┘
+                       │ HTTP (outbound only)
+                       ▼
+┌───────────────────────────────────────────────────────────────┐
+│  MCP Gateway (RHEL VM, Podman)                                │
+│                                                                │
+│  FastAPI :8000                                                │
+│  ├── Auth ─► Keycloak JWT 검증                                │
+│  ├── Request Filter ─► 민감정보 포함 시 403 차단              │
+│  ├── Reverse Proxy ─► /proxy/c7/*, /proxy/exa/*               │
+│  ├── Response Filter ─► 민감정보 [REDACTED] 마스킹            │
+│  ├── /api/v1/logs ─► 검색 로그 조회                           │
+│  ├── /api/v1/filters ─► 필터 규칙 CRUD                       │
+│  ├── /api/v1/audit ─► 감사 로그 조회                          │
+│  └── /api/v1/users ─► 사용자 관리 (Keycloak Admin API)       │
+│                                                                │
+│  Next.js :3000 ─► 보안 담당자 모니터링 포털                   │
+│  ├── 대시보드, 검색 로그, 필터 관리, 감사 로그, 사용자 관리   │
+│                                                                │
+│  PostgreSQL :5432 ─► search_logs, filter_rules, audit_trail   │
+│  Keycloak :8080 ─► 단독 IDP (admin/viewer roles)              │
+└──────────────────────┬────────────────────────────────────────┘
+                       │ HTTPS (outbound only, firewall allowed)
+                       ▼
+                context7.com / api.exa.ai
 ```
 
-### Data Flow: Search Request
+### Data Flow: Proxy Request (Bidirectional Filtering)
 ```
-Client Request (JWT)
-       │
-       ▼
-  ┌─────────┐     ┌──────────┐
-  │ Auth    │────►│ 401/403  │ (invalid token)
-  │ Middleware│    └──────────┘
-  └────┬────┘
-       │ (valid)
-       ▼
-  ┌─────────────┐
-  │ Search API  │
-  │ POST /search│
-  └──────┬──────┘
-         │
-    ┌────┴────┐
-    │ Router  │──── plugin_name?
-    └────┬────┘     │
-         │     ┌────┴────┐
-         │     │ All     │ (None = search all)
-         │     │ Plugins │
-         ▼     └────┬────┘
-  ┌──────────┐      │
-  │ Plugin   │◄─────┘
-  │ .search()│
-  └────┬─────┘
-       │ raw results
-       ▼
-  ┌──────────────┐
-  │ Filter Engine│
-  │ - blocklist  │
-  │ - regex      │
-  │ - quality    │
-  └──────┬───────┘
-         │ filtered results
-    ┌────┴────┐
-    │ DB Save │──► search_logs + search_results + audit_trail
-    └────┬────┘
-         │
-         ▼
-    SearchResponse (JSON)
+Developer PC ──► POST /proxy/c7/libs/search (JWT)
+                        │
+                   ┌────┴────┐
+                   │JWT Auth │──── invalid ──► 401 Unauthorized
+                   └────┬────┘
+                        │ valid
+                   ┌────┴────────┐
+                   │Request Filter│──── sensitive info ──► 403 Blocked + log
+                   └────┬────────┘
+                        │ clean
+                   ┌────┴──────┐
+                   │ Reverse   │──► HTTPS ──► context7.com/api/v2/libs/search
+                   │ Proxy     │◄── 200 OK ◄── upstream response
+                   └────┬──────┘
+                        │
+                   ┌────┴─────────┐
+                   │Response Filter│──── sensitive info ──► [REDACTED] masking
+                   └────┬─────────┘
+                        │
+                   ┌────┴────┐
+                   │ DB Log  │──► search_logs + audit_trail
+                   └────┬────┘
+                        │
+                        ▼
+Developer PC ◄── filtered response
 ```
 
-### Content Filter Pipeline
+### Content Filter: Bidirectional Pipeline
 ```
-  Active Rules (from DB)
-         │
-         ▼
-  ┌──────────────────────────────┐
-  │  For each search result:     │
-  │                              │
-  │  ┌─────────┐  match?        │
-  │  │Blocklist │──────► FILTERED│
-  │  │(keywords)│  no↓          │
-  │  └─────────┘                │
-  │  ┌─────────┐  match?        │
-  │  │ Regex   │──────► FILTERED│
-  │  │(pattern)│  no↓          │
-  │  └─────────┘                │
-  │  ┌─────────┐  below?        │
-  │  │Quality  │──────► FILTERED│
-  │  │Threshold│  no↓          │
-  │  └─────────┘                │
-  │         │                    │
-  │         ▼                    │
-  │      PASSED                  │
-  └──────────────────────────────┘
+                  ┌─── REQUEST FILTER ───┐   ┌── RESPONSE FILTER ──┐
+                  │                      │   │                     │
+  Request Body ──►│ regex rules ─► match?│   │ regex rules ─► match│──► [REDACTED]
+                  │   ├── SSN pattern    │   │   ├── SSN pattern   │
+                  │   ├── IP pattern     │   │   ├── IP pattern    │
+                  │   └── server info    │   │   └── server info   │
+                  │                      │   │                     │
+                  │ keyword rules ─► match│  │ keyword rules ─► match│──► [REDACTED]
+                  │   ├── password       │   │   ├── password      │
+                  │   └── credential     │   │   └── credential    │
+                  │                      │   │                     │
+                  │ ANY match ──► 403    │   │ ANY match ──► mask  │
+                  │ NO match ──► pass    │   │ NO match ──► pass   │
+                  └──────────────────────┘   └─────────────────────┘
 ```
 
 ---
@@ -297,6 +309,38 @@ Completeness is cheap. Don't recommend shortcuts when the complete implementatio
 is a lake (achievable), not an ocean (multi-quarter migration).
 
 ---
+
+## API Endpoints
+
+```
+# Reverse Proxy (developer PC → upstream)
+GET|POST /proxy/c7/{path}        # Context7 proxy → context7.com/api/v2/*
+GET|POST /proxy/exa/{path}       # Exa proxy → api.exa.ai/*
+
+# Search Logs
+GET  /api/v1/logs                # Paginated search log list
+
+# Filter Rules
+GET  /api/v1/filters             # List all filter rules
+POST /api/v1/filters             # Create filter rule
+PATCH /api/v1/filters/{id}       # Update filter rule
+DELETE /api/v1/filters/{id}      # Delete filter rule
+
+# Audit Trail
+GET  /api/v1/audit               # Paginated audit trail
+
+# User Management (Keycloak Admin API proxy)
+GET  /api/v1/users               # List users
+POST /api/v1/users               # Create user
+GET  /api/v1/users/{id}          # Get user details
+PATCH /api/v1/users/{id}         # Update user
+
+# Dashboard
+GET  /api/v1/dashboard/stats     # Dashboard statistics
+
+# Health
+GET  /health                     # No auth required
+```
 
 ## Commands Quick Reference
 
@@ -319,4 +363,5 @@ npm run lint                             # lint
 cd deploy && cp .env.example .env        # configure env
 podman-compose up -d                     # start all services
 podman-compose logs -f backend           # watch backend logs
+podman-compose logs -f keycloak          # watch keycloak logs
 ```

@@ -1,0 +1,21 @@
+FROM registry.access.redhat.com/ubi9/nodejs-20:latest AS builder
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci
+
+COPY frontend/ .
+RUN npm run build
+
+FROM registry.access.redhat.com/ubi9/nodejs-20-minimal:latest
+
+WORKDIR /app
+
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static .next/static
+COPY --from=builder /app/public public/
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]

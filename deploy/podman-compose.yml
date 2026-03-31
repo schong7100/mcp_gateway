@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: registry.access.redhat.com/rhel9/postgresql-15:latest
+    environment:
+      POSTGRESQL_USER: ${POSTGRES_USER:-mcp}
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:-mcp}
+      POSTGRESQL_DATABASE: ${POSTGRES_DB:-mcp_gateway}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/pgsql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mcp} -d ${POSTGRES_DB:-mcp_gateway}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-mcp_gateway}
+      KC_DB_USERNAME: ${POSTGRES_USER:-mcp}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-mcp}
+      KC_DB_SCHEMA: keycloak
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+      - "8080:8080"
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Containerfile.backend
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    command: >
+      sh -c "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Containerfile.frontend
+    env_file: .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
