@@ -64,9 +64,10 @@ class ContentFilter:
                     )
             elif rule.rule_type == "keyword":
                 keywords = [kw.strip() for kw in rule.pattern.split(",")]
-                content_lower = content.lower()
                 for kw in keywords:
-                    if kw.lower() in content_lower:
+                    # 단어 경계 매칭 — totalTokens의 Token 같은 부분 매칭 방지
+                    pattern = r"(?<![a-zA-Z0-9_])" + re.escape(kw) + r"(?![a-zA-Z0-9_])"
+                    if re.search(pattern, content, re.IGNORECASE):
                         matches.append(
                             FilterMatch(
                                 rule_id=str(rule.id),
@@ -87,8 +88,13 @@ class ContentFilter:
             elif rule.rule_type == "keyword":
                 keywords = [kw.strip() for kw in rule.pattern.split(",")]
                 for kw in keywords:
+                    pattern = (
+                        r"(?<![a-zA-Z0-9_])"
+                        + re.escape(kw)
+                        + r"(?![a-zA-Z0-9_])"
+                    )
                     redacted = re.sub(
-                        re.escape(kw), "[REDACTED]", redacted, flags=re.IGNORECASE
+                        pattern, "[REDACTED]", redacted, flags=re.IGNORECASE
                     )
         return redacted
 
