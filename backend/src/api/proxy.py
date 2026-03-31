@@ -166,6 +166,10 @@ async def _handle_proxy(
         if response_filtered and response_filter_details:
             all_matches.extend(response_filter_details.get("matches", []))
         audit_details["masked_rules"] = list({m["rule_name"] for m in all_matches})
+        audit_details["masked_texts"] = [
+            {"rule": m["rule_name"], "text": m["matched_text"]}
+            for m in all_matches
+        ]
         audit_details["match_count"] = len(all_matches)
 
     audit = AuditTrail(

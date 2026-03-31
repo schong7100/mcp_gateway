@@ -95,7 +95,7 @@ export default function LogsPage() {
               checked={filteredOnly}
               onChange={handleFilteredOnlyChange}
             />
-            필터링된 항목만
+            마스킹된 항목만
           </label>
           {data && (
             <span className="ml-auto text-sm text-gray-500">
@@ -112,7 +112,7 @@ export default function LogsPage() {
               <th className="px-6 py-3 text-left font-medium text-gray-500">서비스</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">검색 내용</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">상태</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500">필터</th>
+              <th className="px-6 py-3 text-left font-medium text-gray-500">마스킹</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

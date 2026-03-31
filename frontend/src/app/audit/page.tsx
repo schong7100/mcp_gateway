@@ -28,15 +28,27 @@ function DetailCell({ details }: { details: Record<string, unknown> | null }) {
   const isMasked = details.masking_applied === true;
   if (isMasked) {
     const rules = details.masked_rules as string[] | undefined;
+    const maskedTexts = details.masked_texts as { rule: string; text: string }[] | undefined;
     const count = details.match_count as number | undefined;
     return (
-      <div className="text-xs">
+      <div className="text-xs space-y-1">
         <span className="text-yellow-700 font-medium">마스킹 {count ?? 0}건</span>
-        {rules && rules.length > 0 && (
+        {maskedTexts && maskedTexts.length > 0 ? (
+          <div className="space-y-0.5">
+            {maskedTexts.map((mt, i) => (
+              <div key={i} className="flex items-start gap-1.5">
+                <span className="inline-flex px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium whitespace-nowrap">
+                  {mt.rule}
+                </span>
+                <span className="font-mono text-red-600 break-all">&quot;{mt.text}&quot;</span>
+              </div>
+            ))}
+          </div>
+        ) : rules && rules.length > 0 ? (
           <div className="text-gray-500 mt-0.5">
             {rules.join(', ')}
           </div>
-        )}
+        ) : null}
       </div>
     );
   }
