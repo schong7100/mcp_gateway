@@ -39,7 +39,7 @@ async def _get_jwks() -> dict:
 
 
 async def get_current_user(request: Request) -> CurrentUser:
-    """Keycloak JWT를 검증하고 현재 사용자 정보를 반환합니다."""
+    """Keycloak JWT 또는 Proxy API key를 검증하고 현재 사용자 정보를 반환합니다."""
     if settings.dev_mode:
         return CurrentUser(
             user_id="dev-user",
@@ -48,7 +48,27 @@ async def get_current_user(request: Request) -> CurrentUser:
             roles=["admin"],
         )
 
+    # Proxy API key 인증 (MCP stdio 서버용 — X-API-Key 또는 Bearer token)
+    api_key = request.headers.get("x-api-key", "")
+    if api_key and settings.proxy_api_key and api_key == settings.proxy_api_key:
+        return CurrentUser(
+            user_id="mcp-service",
+            username=request.headers.get("x-mcp-user", "mcp-client"),
+            email=None,
+            roles=["viewer"],
+        )
+
     auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer ") and settings.proxy_api_key:
+        bearer_value = auth_header[7:]
+        if bearer_value == settings.proxy_api_key:
+            return CurrentUser(
+                user_id="mcp-service",
+                username=request.headers.get("x-mcp-user", "mcp-client"),
+                email=None,
+                roles=["viewer"],
+            )
+
     if not auth_header.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -8,9 +8,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://mcp:mcp@localhost:5432/mcp_gateway"
 
     # Upstream APIs
-    context7_base_url: str = "https://context7.com/api/v2"
+    context7_base_url: str = "https://context7.com/api"
     exa_base_url: str = "https://api.exa.ai"
     exa_api_key: str = ""
+
+    # Proxy API key (for MCP stdio servers that can't send JWT)
+    proxy_api_key: str = ""
 
     # Keycloak
     keycloak_url: str = "http://localhost:8080"
