@@ -22,7 +22,7 @@ export function Nav() {
           {isAdmin && (
             <>
               <Link href="/filters" className="hover:text-gray-300 text-sm">
-                필터 관리
+                마스킹 관리
               </Link>
               <Link href="/users" className="hover:text-gray-300 text-sm">
                 사용자 관리

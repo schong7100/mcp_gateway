@@ -4,13 +4,49 @@ import { useEffect, useState, useRef } from 'react';
 import { fetchAuditTrail, AuditTrailEntry, AuditTrailList } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
-const ACTION_LABELS: Record<string, string> = {
-  search: '검색',
-  search_blocked: '검색 차단',
-  filter_create: '필터 생성',
-  filter_update: '필터 수정',
-  filter_delete: '필터 삭제',
-};
+function getActionLabel(entry: AuditTrailEntry): { label: string; color: string } {
+  const isMasked = entry.details?.masking_applied === true;
+  switch (entry.action) {
+    case 'search':
+      return isMasked
+        ? { label: '마스킹', color: 'bg-yellow-100 text-yellow-700' }
+        : { label: '검색', color: 'bg-gray-100 text-gray-700' };
+    case 'filter_create':
+      return { label: '규칙 생성', color: 'bg-blue-100 text-blue-700' };
+    case 'filter_update':
+      return { label: '규칙 수정', color: 'bg-blue-100 text-blue-700' };
+    case 'filter_delete':
+      return { label: '규칙 삭제', color: 'bg-red-100 text-red-700' };
+    default:
+      return { label: entry.action, color: 'bg-gray-100 text-gray-700' };
+  }
+}
+
+function DetailCell({ details }: { details: Record<string, unknown> | null }) {
+  if (!details) return <span className="text-gray-400">—</span>;
+
+  const isMasked = details.masking_applied === true;
+  if (isMasked) {
+    const rules = details.masked_rules as string[] | undefined;
+    const count = details.match_count as number | undefined;
+    return (
+      <div className="text-xs">
+        <span className="text-yellow-700 font-medium">마스킹 {count ?? 0}건</span>
+        {rules && rules.length > 0 && (
+          <div className="text-gray-500 mt-0.5">
+            {rules.join(', ')}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <span className="text-xs text-gray-500 truncate max-w-xs block">
+      {JSON.stringify(details)}
+    </span>
+  );
+}
 
 export default function AuditPage() {
   const { token, isLoading: authLoading } = useAuth();
@@ -69,14 +105,13 @@ export default function AuditPage() {
           >
             <option value="">전체 액션</option>
             <option value="search">검색</option>
-            <option value="search_blocked">검색 차단</option>
-            <option value="filter_create">필터 생성</option>
-            <option value="filter_update">필터 수정</option>
-            <option value="filter_delete">필터 삭제</option>
+            <option value="filter_create">규칙 생성</option>
+            <option value="filter_update">규칙 수정</option>
+            <option value="filter_delete">규칙 삭제</option>
           </select>
           <input
             type="text"
-            placeholder="사용자 ID"
+            placeholder="사용자 IP"
             className="border rounded px-3 py-1.5 text-sm"
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
@@ -93,7 +128,7 @@ export default function AuditPage() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left font-medium text-gray-500">시간</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500">사용자</th>
+              <th className="px-6 py-3 text-left font-medium text-gray-500">사용자 (IP)</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">액션</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">리소스</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">상세</th>
@@ -107,34 +142,31 @@ export default function AuditPage() {
                 </td>
               </tr>
             ) : data && data.items.length > 0 ? (
-              data.items.map((entry: AuditTrailEntry) => (
-                <tr key={entry.id}>
-                  <td className="px-6 py-3 text-gray-600 whitespace-nowrap">
-                    {new Date(entry.created_at).toLocaleString('ko-KR')}
-                  </td>
-                  <td className="px-6 py-3">{entry.user_name}</td>
-                  <td className="px-6 py-3">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      entry.action === 'search_blocked'
-                        ? 'bg-red-100 text-red-700'
-                        : entry.action.startsWith('filter_')
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {ACTION_LABELS[entry.action] ?? entry.action}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-gray-600">
-                    {entry.resource_type}
-                    {entry.resource_id && (
-                      <span className="text-gray-400 text-xs ml-1">#{entry.resource_id.slice(0, 8)}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-3 text-xs text-gray-500 max-w-xs truncate">
-                    {entry.details ? JSON.stringify(entry.details) : '—'}
-                  </td>
-                </tr>
-              ))
+              data.items.map((entry: AuditTrailEntry) => {
+                const { label, color } = getActionLabel(entry);
+                return (
+                  <tr key={entry.id}>
+                    <td className="px-6 py-3 text-gray-600 whitespace-nowrap">
+                      {new Date(entry.created_at).toLocaleString('ko-KR')}
+                    </td>
+                    <td className="px-6 py-3 font-mono text-xs">{entry.user_name}</td>
+                    <td className="px-6 py-3">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
+                        {label}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-gray-600">
+                      {entry.resource_type}
+                      {entry.resource_id && (
+                        <span className="text-gray-400 text-xs ml-1">#{entry.resource_id.slice(0, 8)}</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 max-w-xs">
+                      <DetailCell details={entry.details} />
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td className="px-6 py-8 text-center text-gray-400" colSpan={5}>

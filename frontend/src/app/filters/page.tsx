@@ -88,7 +88,7 @@ export default function FiltersPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">필터 규칙 관리</h1>
+        <h1 className="text-2xl font-bold">마스킹 규칙 관리</h1>
         {isAdmin && (
           <button
             className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
@@ -107,7 +107,7 @@ export default function FiltersPage() {
 
       {showAddForm && isAdmin && (
         <form onSubmit={handleCreate} className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">새 필터 규칙 추가</h2>
+          <h2 className="text-lg font-semibold mb-4">새 마스킹 규칙 추가</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">이름 *</label>
@@ -275,7 +275,7 @@ export default function FiltersPage() {
             ) : (
               <tr>
                 <td className="px-6 py-8 text-center text-gray-400" colSpan={isAdmin ? 7 : 6}>
-                  필터 규칙이 없습니다.
+                  마스킹 규칙이 없습니다.
                 </td>
               </tr>
             )}

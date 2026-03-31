@@ -157,13 +157,24 @@ async def _handle_proxy(
     )
     db.add(log)
 
+    audit_details: dict = {"method": request.method, "masking_applied": filtered}
+    if filtered and filter_details:
+        # 마스킹된 규칙 목록을 상세에 포함
+        all_matches = []
+        if request_filtered and request_filter_details:
+            all_matches.extend(request_filter_details.get("matches", []))
+        if response_filtered and response_filter_details:
+            all_matches.extend(response_filter_details.get("matches", []))
+        audit_details["masked_rules"] = list({m["rule_name"] for m in all_matches})
+        audit_details["match_count"] = len(all_matches)
+
     audit = AuditTrail(
         user_id=user.user_id,
         user_name=user.username,
         action="search",
         resource_type="proxy",
         resource_id=f"{service}/{path}",
-        details={"method": request.method, "filtered": filtered, "masking_applied": filtered},
+        details=audit_details,
     )
     db.add(audit)
     await db.commit()
