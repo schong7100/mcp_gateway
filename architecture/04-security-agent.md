@@ -1,334 +1,346 @@
-# 보안 AI Agent 아키텍처
+# 보안 아키텍처 — 122B 내장 페르소나 방식
 
-## 1. 개요
-
-MCP Gateway의 3계층 보안 아키텍처를 정의합니다.
-개발자 PC에서 외부 검색(Context7, Exa)을 요청할 때, 민감 정보가 외부로 유출되지 않도록
-**AI 기반 문맥 판단**과 **규칙 기반 패턴 차단**을 이중으로 적용합니다.
+**버전**: 2.0 (개정)  
+**작성일**: 2026-04-01  
+**이전 버전**: 3계층 별도 Agent 방식 (폐기)
 
 ---
 
-## 2. 3계층 보안 아키텍처
+## 1. 아키텍처 변경 배경
+
+### 이전 방식 (폐기): 별도 7B 보안 Agent
 
 ```
-개발자 질문
-    ↓
-opencode (Claude/Qwen 122B)
-    ↓ MCP 검색 호출 시도
-    ↓
-┌──────────────────────────────────────────┐
-│ [1차] 보안 AI Agent (7B, pre-hook)       │
-│                                          │
-│  한글 보안 지침 기반 문맥 판단            │
-│  ├── PASS  → 다음 계층으로 전달          │
-│  ├── WARN  → 경고 로그 + 전달            │
-│  └── BLOCK → 즉시 차단, 개발자에게 안내   │
-└──────────────────────────────────────────┘
-    ↓ (PASS / WARN)
-┌──────────────────────────────────────────┐
-│ [2차] MCP Gateway regex 필터             │
-│                                          │
-│  패턴 기반 강제 차단 (13개 규칙)          │
-│  ├── 통과 → upstream 검색 실행           │
-│  └── 차단 → 403 응답                     │
-└──────────────────────────────────────────┘
-    ↓ (통과)
-┌──────────────────────────────────────────┐
-│ [3차] Gateway 감사 로그                  │
-│                                          │
-│  모든 요청/응답 기록 → PostgreSQL         │
-│  보안 담당자 Frontend 포털에서 조회       │
-└──────────────────────────────────────────┘
-    ↓
-외부 검색 (context7.com / api.exa.ai)
+개발자 질문 → [1차] 7B Agent (Ollama) → [2차] Gateway regex → [3차] 감사 로그
+```
+
+- Ollama + Qwen 7B 별도 컨테이너 필요 (RAM 8GB, 디스크 5GB)
+- API 호출 지연 (CPU 2~5초)
+- 모델 업데이트 시 폐쇄망 재배포 부담
+- 별도 인프라 운영/모니터링 비용
+
+### 변경 방식: 122B 모델 내장 보안 페르소나
+
+```
+개발자 질문 → 122B 모델(보안 페르소나 내장) → [1차] Gateway 마스킹 → [2차] 감사 로그
+```
+
+- 별도 Agent 서비스 불필요
+- 보안 정책 MD 파일 = 읽기 전용 배포
+- 보안 담당자가 git으로 정기 배포
+- 122B가 7B보다 훨씬 높은 문맥 이해력
+
+---
+
+## 2. 개정 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  개발자 PC (Windows 11, 폐쇄망)                                  │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────┐      │
+│  │ opencode + 122B 모델 (Claude/Qwen 122B)               │      │
+│  │                                                        │      │
+│  │  ┌──────────────────────────────────────┐             │      │
+│  │  │ 보안 페르소나 (읽기 전용 MD)          │             │      │
+│  │  │  ├── security-policy.md  (보안 지침)  │             │      │
+│  │  │  ├── sensitive-terms.md  (금지어 목록) │             │      │
+│  │  │  └── company-assets.md   (사내 자산)  │             │      │
+│  │  └──────────────────────────────────────┘             │      │
+│  │                                                        │      │
+│  │  opencode.json (읽기 전용)                             │      │
+│  │  ├── MCP 서버 설정 (context7, exa)                    │      │
+│  │  └── 보안 정책 파일 경로 (CLAUDE.md 참조)              │      │
+│  │                                                        │      │
+│  │  context7-mcp (stdio) ──► CONTEXT7_API_URL             │      │
+│  │  exa-mcp-server (stdio) ──► EXA_BASE_URL               │      │
+│  └────────────────────────────────────────────────────────┘      │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │ HTTP
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  MCP Gateway (RHEL VM, Podman)                                   │
+│                                                                  │
+│  [1차 방어] 정규식 마스킹 엔진 (13개 규칙)                        │
+│  ├── 요청 마스킹: 민감정보 → [REDACTED] 후 검색 진행             │
+│  └── 응답 마스킹: 결과 내 민감정보 → [REDACTED]                  │
+│                                                                  │
+│  [2차 방어] 전수 감사 로그                                       │
+│  ├── 원본 쿼리 + 마스킹 규칙 기록                                │
+│  └── 보안 포탈에서 이상 패턴 모니터링                             │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. 각 계층의 역할과 특성
+## 3. 보안 계층 재정의
 
-| 계층 | 방식 | 우회 가능 | 잡는 것 | 못 잡는 것 |
-|------|------|----------|---------|-----------|
-| **1차: 보안 AI Agent** | LLM 문맥 판단 | ❌ 별도 프로세스 | 사내 프로젝트명, 직원 정보, 비즈니스 로직, 의도 분석 | 새로운 패턴의 개인정보 (학습 안 된 형식) |
-| **2차: Gateway regex** | 정규식 패턴 매칭 | ❌ 서버 사이드 | 주민번호, IP, API키, 이메일, 휴대폰 등 정형 패턴 | 문맥 기반 기밀 (비정형) |
-| **3차: 감사 로그** | 전수 기록 | ❌ 서버 사이드 | 사후 감사, 이상 패턴 탐지 | 실시간 차단 불가 (사후 분석) |
+| 계층 | 위치 | 방식 | 잡는 것 | 우회 가능 여부 |
+|------|------|------|---------|---------------|
+| **0차: 보안 페르소나** | 개발자 PC (122B 모델) | LLM 문맥 판단 | 사내 프로젝트명, 의도 분석, 비정형 기밀 | △ 프롬프트 인젝션 가능 (soft layer) |
+| **1차: Gateway 마스킹** | Gateway 서버 | 정규식 패턴 매칭 | 주민번호, IP, API키, 이메일 등 정형 패턴 | ✕ 서버 사이드 강제 |
+| **2차: 감사 로그** | Gateway 서버 | 전수 기록 | 사후 감사, 이상 탐지 | ✕ 서버 사이드 강제 |
 
-### 상호 보완 관계
+### 핵심 통찰
+
+> **0차(페르소나)는 "소프트" 방어, 1차(Gateway)는 "하드" 방어.**  
+> 페르소나가 우회되더라도 Gateway 마스킹이 최종 방어선.  
+> 별도 7B Agent를 두는 것과 비교했을 때 인프라 비용 대비 보안 수준은 동등.
+
+---
+
+## 4. 보안 정책 파일 체계
+
+### 4.1 파일 구성
 
 ```
-             문맥 이해 ↑
-                       │
-  1차 보안 AI Agent ●  │  ← "프로젝트 알파 DB 스키마 찾아줘"
-                       │  ← "김과장 연봉 정보"
-                       │  ← "우리 회사 고객사 목록"
-                       │
-                       │
-  2차 Gateway regex    │  ● ← 주민번호: \d{6}-[1-4]\d{6}
-                       │  ← 사설IP: 10.x.x.x
-                       │  ← API키: AKIA...
-                       │
-              패턴 정확도 →
+C:\opencode\security\              ← 보안 담당자 git repo (읽기 전용)
+├── CLAUDE.md                      ← opencode 시스템 프롬프트 (보안 페르소나)
+├── security-policy.md             ← 보안 판단 기준 (PASS/WARN/BLOCK 지침)
+├── sensitive-terms.md             ← 사내 금지어 목록 (프로젝트명, 고객사명 등)
+├── company-assets.md              ← 보호 대상 자산 목록 (내부 도메인, 시스템명)
+└── opencode.json                  ← MCP 서버 설정 (Gateway URL, API key)
+```
+
+### 4.2 읽기 전용 배포
+
+```powershell
+# Windows 11 — 보안 담당자가 배포 스크립트 실행
+# 개발자에게는 이 스크립트를 제공하지 않음
+
+# 1. 보안 정책 git 저장소 clone (최신 정책)
+git clone https://internal-git/security/opencode-policy.git C:\opencode\security
+
+# 2. 읽기 전용 설정
+icacls "C:\opencode\security\*" /deny %USERNAME%:(W,D,DC) /T
+
+# 3. opencode.json을 사용자 설정 디렉토리에 심볼릭 링크
+mklink "C:\Users\%USERNAME%\.config\opencode\opencode.json" "C:\opencode\security\opencode.json"
+
+# 4. CLAUDE.md를 프로젝트 루트에 심볼릭 링크 (opencode가 자동 로드)
+# → 각 프로젝트 디렉토리에 심볼릭 링크 생성
+```
+
+### 4.3 정기 업데이트 (git pull)
+
+```powershell
+# Windows 작업 스케줄러 또는 GPO로 배포
+# 매일 오전 9시, 보안 정책 git repo를 pull
+
+cd C:\opencode\security
+git pull origin main
+```
+
+**또는** 보안 담당자가 사내 SW 배포 시스템(SCCM 등)으로 정기 푸시.
+
+---
+
+## 5. CLAUDE.md — 보안 페르소나
+
+opencode는 프로젝트 루트의 `CLAUDE.md`를 시스템 프롬프트로 자동 로드합니다.
+보안 페르소나를 여기에 삽입하면 **122B 모델이 모든 대화에서 보안 지침을 따릅니다.**
+
+```markdown
+# 보안 정책 (이 파일은 보안 담당자가 관리합니다 — 수정 금지)
+
+## 역할
+당신은 폐쇄망 개발 환경의 AI 코딩 어시스턴트입니다.
+모든 외부 검색(context7, exa) 전에 아래 보안 지침을 준수해야 합니다.
+
+## 외부 검색 전 자가 점검
+
+검색 쿼리를 작성하기 전에 반드시 아래 체크리스트를 확인하세요:
+
+### 즉시 제거해야 하는 정보
+- 사내 프로젝트명, 코드명, 내부 제품명
+- 고객사명, 협력사명, 계약 정보
+- 직원 실명 + 개인정보 조합
+- 사내 IP, 도메인, 서버 호스트명, 파일 경로
+- API 키, 토큰, 비밀번호, 인증 정보
+- 미공개 기능, 출시 일정, 사업 전략
+
+### 검색 쿼리 작성 원칙
+1. **일반화**: "우리 서버 10.20.30.40에서 에러" → "Linux 서버에서 에러"
+2. **익명화**: "김과장이 만든 인증 모듈" → "JWT 인증 모듈"
+3. **추상화**: "프로젝트 알파의 결제 로직" → "결제 시스템 설계 패턴"
+
+### 검색 불가 주제 (절대 외부 검색하지 마세요)
+- 사내 보안 장비 우회 방법
+- 특정 시스템 + 취약점 조합 (공격 벡터 탐색)
+- 악성코드 제작, 역공학 기법
+
+### 주의 관찰 (검색은 가능하나 주의)
+- 에러 로그에 사내 파일 경로 포함 → 경로 제거 후 검색
+- 설정 파일 내용 포함 → 민감 값 제거 후 검색
+
+## 사내 자산 목록 (sensitive-terms.md 참조)
+이 파일에 명시된 단어가 검색 쿼리에 포함되면 반드시 일반적인 용어로 대체하세요.
+
+## 위반 시 행동
+검색 쿼리에 민감 정보가 포함될 수밖에 없는 경우:
+1. 개발자에게 알림: "⚠️ 이 검색에는 민감 정보가 포함될 수 있습니다."
+2. 민감 부분을 제거/대체한 검색 쿼리를 제안
+3. 개발자 동의 후 검색 진행
 ```
 
 ---
 
-## 4. 보안 AI Agent 상세 설계
+## 6. 방식 비교 — 별도 7B Agent vs 122B 내장 페르소나
 
-### 4.1 모델 선정
+| 항목 | 별도 7B Agent | 122B 내장 페르소나 |
+|------|-------------|-------------------|
+| **인프라 비용** | Ollama 컨테이너 (RAM 8GB, 디스크 5GB) | 없음 (기존 모델 활용) |
+| **운영 복잡도** | 별도 서비스 모니터링, 장애 대응 | 없음 (파일 배포만) |
+| **응답 지연** | +2~5초 (CPU) / +0.5~1초 (GPU) | 없음 (기존 모델 추론에 포함) |
+| **문맥 이해** | 7B 수준 (제한적) | 122B 수준 (우수) |
+| **우회 가능성** | 프롬프트 격리 (낮음) | 프롬프트 인젝션 (중간) |
+| **정책 업데이트** | Ollama 모델 + 프롬프트 양쪽 관리 | MD 파일 git pull (단순) |
+| **폐쇄망 배포** | 모델 파일 USB 이동 필요 | git pull (경량) |
+| **장애 영향** | Agent 다운 시 전체 검색 차단 | 영향 없음 (Gateway가 최종 방어) |
 
-| 항목 | 선정 |
+### 결론
+
+> **122B 내장 페르소나 방식 채택.**
+> 
+> 보안의 "하드" 방어선은 MCP Gateway의 정규식 마스킹 엔진(서버 사이드, 우회 불가).
+> 보안 페르소나는 "소프트" 방어선으로서 **문맥 기반 사전 예방** 역할.
+> 7B Agent 대비 인프라 비용 0, 운영 복잡도 0, 문맥 이해력 상위.
+> 페르소나 우회 리스크는 Gateway 마스킹이 커버.
+
+---
+
+## 7. 위변조 방지 전략
+
+### 7.1 파일 수준
+
+| 파일 | 보호 방식 | 개발자 권한 |
+|------|----------|-----------|
+| `CLAUDE.md` | NTFS ACL 읽기 전용 | 읽기만 가능 |
+| `security-policy.md` | NTFS ACL 읽기 전용 | 읽기만 가능 |
+| `sensitive-terms.md` | NTFS ACL 읽기 전용 | 읽기만 가능 |
+| `opencode.json` | NTFS ACL 읽기 전용 + 심볼릭 링크 | 읽기만 가능 |
+
+```powershell
+# Windows NTFS — 쓰기/삭제 거부
+icacls "C:\opencode\security\*" /deny %USERNAME%:(W,D,DC) /T
+
+# 관리자 권한 없이는 변경 불가
+# 로컬 관리자 권한이 있는 개발자 → 별도 정책 필요 (아래 참조)
+```
+
+### 7.2 관리자 권한 보유 개발자 대응
+
+| 위협 | 대응 |
 |------|------|
-| **모델** | Qwen2.5 7B (한국어 성능 우수) 또는 Llama 3.1 8B |
-| **런타임** | Ollama (CPU 구동, GPU 선택적) |
-| **리소스** | RAM 8GB, 디스크 5GB (모델 파일) |
-| **응답 시간** | CPU: 2~5초, GPU: 0.5~1초 |
-| **배포** | Podman 컨테이너 (MCP Gateway와 동일 네트워크) |
+| 개발자가 로컬 관리자이면 ACL 변경 가능 | GPO(그룹 정책)로 특정 폴더 보호 |
+| 개발자가 opencode.json을 직접 생성 | opencode 실행 전 무결성 체크 스크립트 (SHA256) |
+| 개발자가 CLAUDE.md 삭제/수정 | git pull 스케줄러가 복원 + 변경 감지 시 보안 담당자 알림 |
 
-### 4.2 배포 구성
+```powershell
+# 무결성 체크 스크립트 (작업 스케줄러 등록)
+$expected = Get-Content "C:\opencode\security\.checksums" | ConvertFrom-Json
+$files = @("CLAUDE.md", "security-policy.md", "sensitive-terms.md", "opencode.json")
 
-```yaml
-# deploy/podman-compose.yml
-security-agent:
-  image: ollama/ollama:latest
-  container_name: mcp-security-agent
-  ports:
-    - "11434:11434"
-  volumes:
-    - ollama_data:/root/.ollama
-  restart: unless-stopped
-  deploy:
-    resources:
-      limits:
-        memory: 8G
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
-```
-
-```bash
-# 모델 설치 (인터넷 환경에서 다운로드 후 폐쇄망 이동)
-ollama pull qwen2.5:7b
-
-# 폐쇄망 이동 방법
-# 1. ~/.ollama/models/ 디렉토리를 USB/네트워크로 복사
-# 2. 폐쇄망 서버의 ollama_data 볼륨에 배치
-```
-
-### 4.3 보안 검토 API
-
-```
-POST http://security-agent:11434/api/generate
-Content-Type: application/json
-
-{
-  "model": "qwen2.5:7b",
-  "prompt": "[보안 지침]\n{security_policy}\n\n[검토 대상]\n{query}\n\n[판정]",
-  "stream": false,
-  "format": "json"
+foreach ($f in $files) {
+    $hash = (Get-FileHash "C:\opencode\security\$f" -Algorithm SHA256).Hash
+    if ($hash -ne $expected.$f) {
+        # 알림: 파일 변조 감지
+        Invoke-RestMethod -Uri "http://gateway:8000/api/v1/audit" -Method POST `
+          -Body (@{action="security_tamper"; details=@{file=$f; expected=$expected.$f; actual=$hash}} | ConvertTo-Json)
+        # 복원
+        git -C "C:\opencode\security" checkout -- $f
+    }
 }
 ```
 
-**응답 형식:**
-```json
-{
-  "decision": "PASS",
-  "reason": "일반적인 기술 질문",
-  "detected": []
-}
-```
-
-```json
-{
-  "decision": "BLOCK",
-  "reason": "사내 프로젝트 코드명 '프로젝트 알파'가 포함됨",
-  "detected": ["프로젝트 알파"]
-}
-```
-
-```json
-{
-  "decision": "WARN",
-  "reason": "CVE 취약점과 특정 버전 조합 — 공격 벡터 탐색 가능성",
-  "detected": ["CVE-2024-1234", "Apache 2.4.49"]
-}
-```
-
-### 4.4 pre-hook 연동
+### 7.3 Gateway가 최종 방어선인 이유
 
 ```
-opencode.json hooks 설정
-    ↓
-MCP 도구 호출 전 (context7, exa)
-    ↓
-security-check.sh 실행
-    ↓
-Ollama API 호출 → 판정
-    ↓
-BLOCK → exit 1 (호출 차단)
-WARN  → 경고 출력 + exit 0 (통과)
-PASS  → exit 0 (통과)
+개발자가 보안 페르소나를 우회했다고 가정:
+
+개발자 → "프롬프트 인젝션으로 보안 지침 무시" → 외부 검색 시도
+         → context7-mcp → HTTP → MCP Gateway
+                                    ↓
+                              [정규식 마스킹 엔진]  ← 서버 사이드, 우회 불가
+                              주민번호 → [REDACTED]
+                              사설 IP → [REDACTED]
+                              API 키 → [REDACTED]
+                                    ↓
+                              [감사 로그 기록]      ← 서버 사이드, 삭제 불가
+                              원본 쿼리 저장
+                              보안 담당자 모니터링
+                                    ↓
+                              외부 검색 (마스킹된 쿼리만 전송)
 ```
 
-**security-check.sh (개발자 PC에 배포):**
-```bash
-#!/bin/bash
-# MCP 도구 호출 전 보안 검토 스크립트
-# opencode pre-hook으로 등록
-
-SECURITY_AGENT_URL="http://gateway-server:11434/api/generate"
-QUERY="$1"
-
-RESULT=$(curl -s -X POST "$SECURITY_AGENT_URL" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"model\": \"qwen2.5:7b\",
-    \"prompt\": \"$(cat /etc/opencode/security-policy.txt)\\n\\n[검토 대상]\\n${QUERY}\\n\\n[판정]\",
-    \"stream\": false,
-    \"format\": \"json\"
-  }")
-
-DECISION=$(echo "$RESULT" | python3 -c "import json,sys; print(json.loads(json.load(sys.stdin)['response'])['decision'])")
-
-case "$DECISION" in
-  BLOCK)
-    echo "⛔ 보안 검토 차단: $(echo "$RESULT" | python3 -c "import json,sys; print(json.loads(json.load(sys.stdin)['response'])['reason'])")"
-    exit 1
-    ;;
-  WARN)
-    echo "⚠️ 보안 경고: $(echo "$RESULT" | python3 -c "import json,sys; print(json.loads(json.load(sys.stdin)['response'])['reason'])")"
-    exit 0
-    ;;
-  *)
-    exit 0
-    ;;
-esac
-```
-
-**보안 강화:**
-```bash
-# 스크립트를 읽기 전용으로 설정 (개발자 수정 방지)
-chmod 444 /etc/opencode/security-check.sh
-chmod 444 /etc/opencode/security-policy.txt
-chown root:root /etc/opencode/security-check.sh
-```
+**결론**: 페르소나가 우회되어도 정형 패턴(PII, 인프라 정보)은 Gateway에서 100% 마스킹. 비정형 기밀(프로젝트명 등)은 `sensitive-terms.md`의 키워드를 Gateway 마스킹 규칙에도 동기화하면 커버 가능.
 
 ---
 
-## 5. 한글 보안 지침 (security-policy.txt)
+## 8. 보안 담당자 운영 워크플로우
 
-보안 AI Agent가 참조하는 판단 기준입니다.
-보안 담당자가 한글로 작성하고, 7B 모델이 이를 해석하여 판정합니다.
-
-```
-당신은 폐쇄망 환경의 보안 검토 에이전트입니다.
-개발자가 외부 검색 API로 보내려는 쿼리를 검토하여 민감 정보 유출을 방지합니다.
-
-## 즉시 차단 (BLOCK)
-
-### 사내 기밀
-- 사내 프로젝트명, 코드명, 내부 제품명이 포함된 검색
-- 고객사명, 협력사명, 계약 정보가 포함된 검색
-- 사내 조직도, 부서 구조, 인사 정보가 포함된 검색
-- 미공개 기능, 출시 일정, 사업 전략이 포함된 검색
-- 사내 시스템 URL, 내부 도메인, 서버 호스트명이 포함된 검색
-
-### 개인정보
-- 특정 직원의 실명 + 직급/부서/연봉 등 개인정보 조합
-- 고객의 실명, 연락처, 주소 등 개인정보
-
-### 보안 위협
-- 사내 시스템의 특정 버전 + 취약점 조합 (공격 벡터 탐색)
-- 보안 장비/정책 우회 방법 검색
-- 악성코드 제작, 역공학, 침투 테스트 관련 검색 (승인 없는 경우)
-
-## 주의 관찰 — WARN (통과하되 로그 기록)
-- 에러 로그에 포함된 사내 파일 경로 (디렉토리 구조 노출 가능)
-- 짧은 시간에 동일 주제 대량 반복 검색 (정보 수집 패턴)
-- 특정 기술의 보안 취약점만 집중 검색하는 경우
-
-## 통과 — PASS
-- 일반적인 프로그래밍 질문, 라이브러리 사용법
-- 공개된 기술 문서, 오픈소스 프로젝트 검색
-- 에러 메시지 해결, 디버깅 방법 검색
-- 표준 프레임워크, 언어 문법, API 레퍼런스 검색
-
-## 판정 규칙
-1. 의심스러우면 BLOCK — 오탐이 미탐보다 낫다
-2. 기술 용어와 사내 고유명사를 구분하라
-3. 일반적인 단어라도 사내 맥락에서 기밀이 될 수 있다
-4. BLOCK 시 반드시 이유와 감지된 항목을 명시하라
-
-## 응답 형식 (JSON만 출력, 다른 텍스트 금지)
-{"decision": "PASS|WARN|BLOCK", "reason": "판단 근거 (한국어)", "detected": ["감지된 항목 목록"]}
-```
-
----
-
-## 6. 우회 방지 전략
-
-| 우회 시도 | 방어 수단 |
-|----------|----------|
-| pre-hook 스크립트 삭제/수정 | `chmod 444 + chown root` — 일반 사용자 수정 불가 |
-| opencode 설정에서 hook 제거 | 글로벌 설정 파일 읽기 전용 + 파일 변경 모니터링 (inotifywait) |
-| 직접 curl로 Gateway 호출 | Gateway API key는 보안 담당자만 관리, 개발자에게 미공개 |
-| 프롬프트 인젝션으로 7B 우회 | 7B는 별도 프로세스 — 프롬프트가 격리됨. 추가로 Gateway regex가 2차 방어 |
-| 보안 지침 파일 수정 | `/etc/opencode/security-policy.txt` root 소유, 읽기 전용 |
-| 새 MCP 서버 직접 설치 | 폐쇄망 — 외부 패키지 설치 불가. 내부 저장소에서만 설치 가능 |
-
----
-
-## 7. 모니터링 및 운영
-
-### 보안 이벤트 흐름
+### 8.1 정책 변경 프로세스
 
 ```
-보안 AI Agent
-    ├── BLOCK → Gateway 감사 로그 API 호출 (POST /api/v1/audit)
-    │           action: "security_agent_block"
-    │           details: { decision, reason, detected, query }
+보안 담당자
     │
-    ├── WARN  → Gateway 감사 로그 API 호출
-    │           action: "security_agent_warn"
+    ├── 1. 보안 정책 git repo 수정
+    │      ├── sensitive-terms.md 업데이트 (새 금지어 추가)
+    │      ├── CLAUDE.md 보안 지침 개정
+    │      └── commit + push
     │
-    └── PASS  → 로그 없음 (정상 트래픽)
+    ├── 2. MCP Gateway 마스킹 규칙 동기화
+    │      └── 포탈 (http://gateway:3000/filters) 에서 규칙 추가
+    │          (sensitive-terms.md의 키워드를 Gateway에도 등록)
+    │
+    └── 3. 개발자 PC 자동 업데이트
+           └── 작업 스케줄러가 git pull → CLAUDE.md/정책 파일 갱신
 ```
 
-### 보안 담당자 대시보드 확장 (향후)
+### 8.2 이중 방어 동기화
 
-| 지표 | 설명 |
-|------|------|
-| 보안 Agent 차단 건수 | 1차 AI 판단으로 차단된 횟수 |
-| Gateway 차단 건수 | 2차 regex로 차단된 횟수 |
-| 이중 차단 건수 | 1차 통과 → 2차 차단 (AI 오탐 분석용) |
-| WARN 건수 | 주의 관찰 대상 — 패턴 분석 필요 |
-| 사용자별 차단 비율 | 특정 개발자의 이상 행동 감지 |
+보안 담당자가 새 금지어를 추가할 때:
 
----
+| 단계 | 작업 | 효과 |
+|------|------|------|
+| 1 | `sensitive-terms.md`에 키워드 추가 | 122B 모델이 검색 전 자가 점검 (소프트) |
+| 2 | Gateway 마스킹 규칙에 keyword 추가 | 서버에서 강제 마스킹 (하드) |
 
-## 8. 구현 로드맵
-
-| 단계 | 작업 | 선행 조건 | 예상 공수 |
-|------|------|----------|----------|
-| **Phase 1** | Ollama + Qwen2.5 7B 컨테이너 배포 | Podman 환경 | 2시간 |
-| **Phase 2** | 보안 검토 API 서버 (FastAPI 래퍼) | Phase 1 | 3시간 |
-| **Phase 3** | security-check.sh pre-hook 스크립트 | Phase 2 | 2시간 |
-| **Phase 4** | 한글 보안 지침 작성 + 보안 담당자 검토 | — | 1시간 |
-| **Phase 5** | Gateway 감사 로그 연동 | Phase 2-3 | 2시간 |
-| **Phase 6** | 개발자 PC 배포 + 테스트 | Phase 1-5 | 3시간 |
-| **Phase 7** | 대시보드 보안 지표 추가 (선택) | Phase 5 | 4시간 |
-
-**총 예상 공수: ~17시간 (2~3일)**
+> **원칙**: sensitive-terms.md에 추가한 것은 Gateway에도 반드시 등록.
+> Gateway 규칙이 "하드 방어"이므로 이것만 빠뜨리지 않으면 안전.
 
 ---
 
-## 9. 제약 사항 및 리스크
+## 9. 구현 로드맵
+
+| 단계 | 작업 | 예상 공수 |
+|------|------|----------|
+| **Phase 1** | 보안 정책 MD 파일 초안 작성 (CLAUDE.md, sensitive-terms.md) | 2시간 |
+| **Phase 2** | 보안 정책 전용 git 저장소 생성 + 초기 커밋 | 30분 |
+| **Phase 3** | Windows 배포 스크립트 작성 (읽기 전용 + 심볼릭 링크) | 1시간 |
+| **Phase 4** | 무결성 체크 스크립트 작성 (SHA256 + 변조 알림) | 1시간 |
+| **Phase 5** | 작업 스케줄러 등록 (정기 git pull + 무결성 체크) | 30분 |
+| **Phase 6** | sensitive-terms.md ↔ Gateway 규칙 동기화 가이드 작성 | 1시간 |
+| **Phase 7** | 개발자 공지 + 보안 담당자 매뉴얼 업데이트 | 1시간 |
+
+**총 예상 공수: ~7시간 (1일)**  
+*(이전 3계층 방식 ~17시간 대비 60% 절감)*
+
+---
+
+## 10. 제약 사항 및 리스크
 
 | 리스크 | 영향 | 대응 |
 |--------|------|------|
-| 7B 모델 오탐 (정상 쿼리 차단) | 개발 생산성 저하 | WARN 우선 운영 → 안정화 후 BLOCK 전환 |
-| 7B 미탐 (기밀 통과) | 정보 유출 | Gateway regex가 2차 방어 |
-| Ollama 서버 장애 | 검색 전체 차단 | healthcheck + 장애 시 Gateway만으로 운영 (fallback) |
-| 응답 지연 (CPU 2~5초) | 개발자 체감 속도 저하 | GPU 배포 또는 경량 모델(3B)로 대체 |
-| 모델 업데이트 | 폐쇄망 재배포 필요 | USB/내부망 전송 프로세스 수립 |
+| 프롬프트 인젝션으로 페르소나 우회 | 비정형 기밀 유출 가능 | Gateway 마스킹이 최종 방어 + 감사 로그 사후 분석 |
+| 개발자가 관리자 권한으로 파일 변조 | 보안 정책 무력화 | GPO + 무결성 체크 + 변조 알림 |
+| sensitive-terms.md와 Gateway 규칙 불일치 | 방어 공백 | 동기화 가이드 + 정기 점검 체크리스트 |
+| 122B 모델이 보안 지침을 완벽히 따르지 않음 | 오탐/미탐 | Gateway 마스킹이 커버 (정형 패턴 100%) |
+
+### 수용 가능한 리스크
+
+> 122B 페르소나는 **"최선의 노력(best-effort)"** 방어입니다.
+> Gateway 마스킹이 **"보장된(guaranteed)"** 방어입니다.
+> 두 계층을 합치면 비정형+정형 기밀 모두 커버하되,
+> 비정형 기밀의 100% 차단은 보장하지 않습니다.
+> 이 갭은 감사 로그 모니터링 + 보안 담당자 사후 분석으로 커버합니다.
