@@ -18,7 +18,7 @@ from sqlalchemy.pool import NullPool
 
 from src.api.deps import CurrentUser, get_current_user
 from src.db.base import Base
-from src.db.models import SearchLog
+from src.db.models import AuditTrail, SearchLog
 from src.db.session import get_db
 from src.main import app
 
@@ -190,6 +190,155 @@ class TestAuth:
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             resp = await ac.get("/health")
             assert resp.status_code == 200
+
+
+class TestExport:
+    @pytest.mark.asyncio
+    async def test_logs_export_jsonl(self, client: AsyncClient) -> None:
+        async with TestSessionLocal() as db:
+            db.add(SearchLog(
+                user_id="u1", user_name="tester", service="c7",
+                method="GET", path="v2/libs/search",
+                request_body={"query_params": {"query": "fastapi"}},
+                response_status=200, filtered=False,
+            ))
+            await db.commit()
+
+        resp = await client.get("/api/v1/logs/export?format=jsonl&period=1d")
+        assert resp.status_code == 200
+        assert "application/x-ndjson" in resp.headers["content-type"]
+        lines = resp.text.strip().split("\n")
+        assert len(lines) == 1
+        import json
+        row = json.loads(lines[0])
+        assert row["user_name"] == "tester"
+        assert row["filtered"] is False
+
+    @pytest.mark.asyncio
+    async def test_logs_export_csv(self, client: AsyncClient) -> None:
+        async with TestSessionLocal() as db:
+            db.add(SearchLog(
+                user_id="u1", user_name="tester", service="c7",
+                method="GET", path="search", response_status=200, filtered=False,
+            ))
+            await db.commit()
+
+        resp = await client.get("/api/v1/logs/export?format=csv&period=1d")
+        assert resp.status_code == 200
+        assert "text/csv" in resp.headers["content-type"]
+        lines = resp.text.strip().split("\n")
+        assert len(lines) == 2  # header + 1 row
+        assert lines[0].startswith("time,")
+
+    @pytest.mark.asyncio
+    async def test_logs_export_filtered_only(self, client: AsyncClient) -> None:
+        async with TestSessionLocal() as db:
+            db.add(SearchLog(
+                user_id="u1", user_name="a", service="c7",
+                method="GET", path="s", response_status=200, filtered=False,
+            ))
+            db.add(SearchLog(
+                user_id="u1", user_name="a", service="c7",
+                method="GET", path="s", response_status=403, filtered=True,
+                filter_details={"matches": [{"rule_name": "사설IP"}]},
+            ))
+            await db.commit()
+
+        resp = await client.get("/api/v1/logs/export?format=jsonl&period=1d&filtered_only=true")
+        lines = resp.text.strip().split("\n")
+        assert len(lines) == 1
+
+    @pytest.mark.asyncio
+    async def test_audit_export_jsonl(self, client: AsyncClient) -> None:
+        async with TestSessionLocal() as db:
+            db.add(AuditTrail(
+                user_id="u1", user_name="tester", action="search_blocked",
+                resource_type="proxy", resource_id="c7/search",
+                details={"blocked_rules": ["사설IP"], "match_count": 1},
+            ))
+            await db.commit()
+
+        resp = await client.get("/api/v1/audit/export?format=jsonl&period=1d")
+        assert resp.status_code == 200
+        lines = resp.text.strip().split("\n")
+        assert len(lines) == 1
+        import json
+        row = json.loads(lines[0])
+        assert row["action"] == "search_blocked"
+
+    @pytest.mark.asyncio
+    async def test_audit_export_empty_period(self, client: AsyncClient) -> None:
+        resp = await client.get("/api/v1/audit/export?format=jsonl&period=1h")
+        assert resp.status_code == 200
+        assert resp.text.strip() == ""
+
+
+class TestSecurityReport:
+    @pytest.mark.asyncio
+    async def test_empty_report(self, client: AsyncClient) -> None:
+        resp = await client.get("/api/v1/reports/security?period=7d")
+        assert resp.status_code == 200
+        assert "보안 분석 리포트" in resp.text
+        assert "총 검색 요청: 0건" in resp.text
+
+    @pytest.mark.asyncio
+    async def test_report_with_data(self, client: AsyncClient) -> None:
+        async with TestSessionLocal() as db:
+            # 정상 검색
+            db.add(SearchLog(
+                user_id="u1", user_name="kim", service="c7",
+                method="POST", path="v2/libs/search",
+                request_body={"body": {"query": "fastapi error"}},
+                response_status=200, filtered=False,
+            ))
+            # 차단된 검색
+            db.add(SearchLog(
+                user_id="u2", user_name="park", service="c7",
+                method="POST", path="v2/libs/search",
+                request_body={"body": {"query": "10.20.30.40 서버"}},
+                response_status=403, filtered=True,
+                filter_details={"matches": [
+                    {"rule_name": "사설IP", "rule_type": "regex", "matched_text": "10.20.30.40"},
+                ]},
+            ))
+            # 차단 감사 로그
+            db.add(AuditTrail(
+                user_id="u2", user_name="park", action="search_blocked",
+                resource_type="proxy", resource_id="c7/v2/libs/search",
+                details={"blocked_rules": ["사설IP"], "match_count": 1},
+            ))
+            await db.commit()
+
+        resp = await client.get("/api/v1/reports/security?period=1d")
+        text = resp.text
+        assert "총 검색 요청: 2건" in text
+        assert "차단: 1건" in text
+        assert "park" in text
+        assert "사설IP" in text
+
+    @pytest.mark.asyncio
+    async def test_report_burst_detection(self, client: AsyncClient) -> None:
+        """30분 내 3건 이상 차단 시 burst 패턴 탐지."""
+        from datetime import UTC, datetime, timedelta
+
+        base_time = datetime.now(tz=UTC) - timedelta(hours=1)
+        async with TestSessionLocal() as db:
+            for i in range(4):
+                db.add(SearchLog(
+                    user_id="u-bad", user_name="suspicious",
+                    service="c7", method="POST", path="search",
+                    request_body={"body": {"query": f"attempt {i}"}},
+                    response_status=403, filtered=True,
+                    filter_details={"matches": [
+                        {"rule_name": "사설IP", "rule_type": "regex", "matched_text": "10.0.0.1"},
+                    ]},
+                    created_at=base_time + timedelta(minutes=i * 5),
+                ))
+            await db.commit()
+
+        resp = await client.get("/api/v1/reports/security?period=1d")
+        assert "suspicious" in resp.text
+        assert "4건" in resp.text
 
 
 class TestSeed:

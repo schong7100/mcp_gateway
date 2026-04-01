@@ -9,6 +9,7 @@ from src.api.dashboard import router as dashboard_router
 from src.api.filters import router as filters_router
 from src.api.logs import router as logs_router
 from src.api.proxy import router as proxy_router
+from src.api.reports import router as reports_router
 from src.api.users import router as users_router
 
 
@@ -51,6 +52,7 @@ app.include_router(filters_router)
 app.include_router(audit_router)
 app.include_router(users_router)
 app.include_router(dashboard_router)
+app.include_router(reports_router)
 
 
 @app.get("/health")
