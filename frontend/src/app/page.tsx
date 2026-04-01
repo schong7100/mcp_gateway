@@ -58,9 +58,9 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-sm font-medium text-gray-500">마스킹 건수</h2>
-          <p className="text-3xl font-bold mt-2 text-yellow-600">
-            {loading ? '...' : stats?.masked_today ?? 0}
+          <h2 className="text-sm font-medium text-gray-500">차단 건수</h2>
+          <p className="text-3xl font-bold mt-2 text-red-600">
+            {loading ? '...' : stats?.blocked_today ?? 0}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">

@@ -24,14 +24,14 @@ async def dashboard_stats(
     )
     total_today = total_result.scalar_one()
 
-    # 오늘 마스킹 건수 (요청+응답 통합 — filtered=True)
-    masked_result = await db.execute(
+    # 오늘 차단 건수 (response_status=403)
+    blocked_result = await db.execute(
         select(func.count(SearchLog.id)).where(
             SearchLog.created_at >= today_start,
-            SearchLog.filtered.is_(True),
+            SearchLog.response_status == 403,
         )
     )
-    masked_today = masked_result.scalar_one()
+    blocked_today = blocked_result.scalar_one()
 
     # 활성 필터 규칙 수
     active_rules_result = await db.execute(
@@ -66,7 +66,7 @@ async def dashboard_stats(
 
     return {
         "total_today": total_today,
-        "masked_today": masked_today,
+        "blocked_today": blocked_today,
         "active_rules": active_rules,
         "service_breakdown": service_breakdown,
         "hourly_trend": hourly_trend,

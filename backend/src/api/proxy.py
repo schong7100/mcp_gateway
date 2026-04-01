@@ -44,11 +44,7 @@ async def _handle_proxy(
     body = original_body  # 마스킹 후 교체될 수 있음
     headers = dict(request.headers)
 
-    # 요청 마스킹 — 민감 정보를 [REDACTED]로 치환 후 업스트림 전달
-    request_filtered = False
-    request_filter_details: dict | None = None
-    masked_query = request.url.query or ""
-
+    # 요청 필터 — 민감 정보 포함 시 403 차단
     request_text_parts = []
     if body:
         request_text_parts.append(body.decode("utf-8", errors="ignore"))
@@ -61,8 +57,7 @@ async def _handle_proxy(
         if request_rules:
             input_result = content_filter.apply(request_rules, request_text)
             if not input_result.passed:
-                request_filtered = True
-                request_filter_details = {
+                filter_details = {
                     "direction": "request",
                     "matches": [
                         {
@@ -74,39 +69,71 @@ async def _handle_proxy(
                         for m in input_result.matches
                     ],
                 }
-                # 요청 본문 마스킹
-                if body:
-                    masked_body_str = content_filter.redact(
-                        request_rules, body.decode("utf-8", errors="ignore")
-                    )
-                    body = masked_body_str.encode("utf-8")
-                # 쿼리 스트링 마스킹
-                if request.url.query:
-                    masked_query = content_filter.redact(request_rules, request.url.query)
+                # 차단 로그 저장
+                request_body_json = _parse_request_body(original_body, request.url.query)
+                log = SearchLog(
+                    user_id=user.user_id,
+                    user_name=user.username,
+                    service=service,
+                    method=request.method,
+                    path=path,
+                    request_body=request_body_json,
+                    response_status=403,
+                    response_body={"error": "Blocked by content filter"},
+                    filtered=True,
+                    filter_details=filter_details,
+                )
+                db.add(log)
+                audit = AuditTrail(
+                    user_id=user.user_id,
+                    user_name=user.username,
+                    action="search_blocked",
+                    resource_type="proxy",
+                    resource_id=f"{service}/{path}",
+                    details={
+                        "method": request.method,
+                        "blocked_rules": [m["rule_name"] for m in filter_details["matches"]],
+                        "blocked_texts": [
+                            {"rule": m["rule_name"], "text": m["matched_text"]}
+                            for m in filter_details["matches"]
+                        ],
+                        "match_count": len(filter_details["matches"]),
+                    },
+                )
+                db.add(audit)
+                await db.commit()
+                return Response(
+                    content=json.dumps({
+                        "error": "Request blocked by content filter",
+                        "matches": [m["rule_name"] for m in filter_details["matches"]],
+                    }),
+                    status_code=403,
+                    media_type="application/json",
+                )
 
-    # 업스트림으로 요청 전달 (마스킹된 본문/쿼리)
+    # 업스트림으로 요청 전달
     upstream_resp = await forward_request(
         service=service,
         path=path,
         method=request.method,
         headers=headers,
         body=body if body else None,
-        query_string=masked_query,
+        query_string=request.url.query or "",
     )
 
     response_body = upstream_resp.content
     response_text = upstream_resp.text
-    response_filtered = False
-    response_filter_details: dict | None = None
+    filtered = False
+    filter_details: dict | None = None
 
-    # 응답 필터 — 민감 정보 마스킹
+    # 응답 필터 — 민감 정보 [REDACTED] 치환
     if settings.filter_enabled and upstream_resp.status_code == 200:
         response_rules = await content_filter.load_rules(db, service, direction="response")
         if response_rules:
             filter_result = content_filter.apply(response_rules, response_text)
             if not filter_result.passed:
-                response_filtered = True
-                response_filter_details = {
+                filtered = True
+                filter_details = {
                     "direction": "response",
                     "matches": [
                         {
@@ -121,20 +148,7 @@ async def _handle_proxy(
                 response_text = content_filter.redact(response_rules, response_text)
                 response_body = response_text.encode("utf-8")
 
-    # 마스킹 종합 — 요청/응답 중 하나라도 마스킹되면 filtered=True
-    filtered = request_filtered or response_filtered
-    if request_filtered and response_filtered:
-        filter_details: dict | None = {
-            "directions": ["request", "response"],
-            "request": request_filter_details,
-            "response": response_filter_details,
-        }
-    elif request_filtered:
-        filter_details = request_filter_details
-    else:
-        filter_details = response_filter_details
-
-    # 검색 로그 저장 (request_body는 마스킹 전 원본 쿼리 기록)
+    # 검색 로그 저장
     request_body_json = _parse_request_body(original_body, request.url.query)
 
     response_body_json = None
@@ -157,20 +171,15 @@ async def _handle_proxy(
     )
     db.add(log)
 
-    audit_details: dict = {"method": request.method, "masking_applied": filtered}
+    audit_details: dict = {"method": request.method, "filtered": filtered}
     if filtered and filter_details:
-        # 마스킹된 규칙 목록을 상세에 포함
-        all_matches = []
-        if request_filtered and request_filter_details:
-            all_matches.extend(request_filter_details.get("matches", []))
-        if response_filtered and response_filter_details:
-            all_matches.extend(response_filter_details.get("matches", []))
-        audit_details["masked_rules"] = list({m["rule_name"] for m in all_matches})
-        audit_details["masked_texts"] = [
+        matches = filter_details.get("matches", [])
+        audit_details["filter_rules"] = list({m["rule_name"] for m in matches})
+        audit_details["filter_texts"] = [
             {"rule": m["rule_name"], "text": m["matched_text"]}
-            for m in all_matches
+            for m in matches
         ]
-        audit_details["match_count"] = len(all_matches)
+        audit_details["match_count"] = len(matches)
 
     audit = AuditTrail(
         user_id=user.user_id,

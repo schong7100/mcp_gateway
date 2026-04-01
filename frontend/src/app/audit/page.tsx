@@ -5,12 +5,11 @@ import { fetchAuditTrail, AuditTrailEntry, AuditTrailList } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 function getActionLabel(entry: AuditTrailEntry): { label: string; color: string } {
-  const isMasked = entry.details?.masking_applied === true;
   switch (entry.action) {
     case 'search':
-      return isMasked
-        ? { label: '마스킹', color: 'bg-yellow-100 text-yellow-700' }
-        : { label: '검색', color: 'bg-gray-100 text-gray-700' };
+      return { label: '검색', color: 'bg-gray-100 text-gray-700' };
+    case 'search_blocked':
+      return { label: '차단', color: 'bg-red-100 text-red-700' };
     case 'filter_create':
       return { label: '규칙 생성', color: 'bg-blue-100 text-blue-700' };
     case 'filter_update':
@@ -25,30 +24,25 @@ function getActionLabel(entry: AuditTrailEntry): { label: string; color: string 
 function DetailCell({ details }: { details: Record<string, unknown> | null }) {
   if (!details) return <span className="text-gray-400">—</span>;
 
-  const isMasked = details.masking_applied === true;
-  if (isMasked) {
-    const rules = details.masked_rules as string[] | undefined;
-    const maskedTexts = details.masked_texts as { rule: string; text: string }[] | undefined;
-    const count = details.match_count as number | undefined;
+  const blockedTexts = details.blocked_texts as { rule: string; text: string }[] | undefined;
+  const filterTexts = details.filter_texts as { rule: string; text: string }[] | undefined;
+  const texts = blockedTexts ?? filterTexts;
+  const count = details.match_count as number | undefined;
+
+  if (texts && texts.length > 0) {
     return (
       <div className="text-xs space-y-1">
-        <span className="text-yellow-700 font-medium">마스킹 {count ?? 0}건</span>
-        {maskedTexts && maskedTexts.length > 0 ? (
-          <div className="space-y-0.5">
-            {maskedTexts.map((mt, i) => (
-              <div key={i} className="flex items-start gap-1.5">
-                <span className="inline-flex px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium whitespace-nowrap">
-                  {mt.rule}
-                </span>
-                <span className="font-mono text-red-600 break-all">&quot;{mt.text}&quot;</span>
-              </div>
-            ))}
-          </div>
-        ) : rules && rules.length > 0 ? (
-          <div className="text-gray-500 mt-0.5">
-            {rules.join(', ')}
-          </div>
-        ) : null}
+        <span className="text-red-700 font-medium">차단 {count ?? texts.length}건</span>
+        <div className="space-y-0.5">
+          {texts.map((mt, i) => (
+            <div key={i} className="flex items-start gap-1.5">
+              <span className="inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium whitespace-nowrap">
+                {mt.rule}
+              </span>
+              <span className="font-mono text-red-600 break-all">&quot;{mt.text}&quot;</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -117,6 +111,7 @@ export default function AuditPage() {
           >
             <option value="">전체 액션</option>
             <option value="search">검색</option>
+            <option value="search_blocked">차단</option>
             <option value="filter_create">규칙 생성</option>
             <option value="filter_update">규칙 수정</option>
             <option value="filter_delete">규칙 삭제</option>
