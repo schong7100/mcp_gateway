@@ -1,13 +1,19 @@
 FROM registry.access.redhat.com/ubi9/python-311:latest
 
+USER 0
 WORKDIR /app
 
 COPY backend/pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || pip install --no-cache-dir .
-
 COPY backend/src/ src/
+
+RUN pip install --no-cache-dir . && \
+    chown -R 1001:0 /app && \
+    chmod -R g=u /app
+
 COPY backend/alembic/ alembic/
 COPY backend/alembic.ini .
+
+USER 1001
 
 EXPOSE 8000
 
