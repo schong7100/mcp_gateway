@@ -18,12 +18,10 @@ def _parse_request_body(body: bytes, query_string: str | None) -> dict | None:
     """요청 본문과 query string을 로그용 JSON으로 변환합니다."""
     result: dict = {}
 
-    # Query string → dict (GET 요청의 검색어 등)
     if query_string:
         params = parse_qs(query_string)
         result["query_params"] = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
 
-    # POST body
     if body:
         try:
             result["body"] = json.loads(body)
@@ -40,11 +38,10 @@ async def _handle_proxy(
     user: CurrentUser,
     db: AsyncSession,
 ) -> Response:
-    original_body = await request.body()
-    body = original_body  # 마스킹 후 교체될 수 있음
+    body = await request.body()
     headers = dict(request.headers)
 
-    # 요청 필터 — 민감 정보 포함 시 403 차단
+    # 요청 필터 — 민감 정보 포함 시 403 차단 (최후 방어선)
     request_text_parts = []
     if body:
         request_text_parts.append(body.decode("utf-8", errors="ignore"))
@@ -69,8 +66,7 @@ async def _handle_proxy(
                         for m in input_result.matches
                     ],
                 }
-                # 차단 로그 저장
-                request_body_json = _parse_request_body(original_body, request.url.query)
+                request_body_json = _parse_request_body(body, request.url.query)
                 log = SearchLog(
                     user_id=user.user_id,
                     user_name=user.username,
@@ -123,33 +119,9 @@ async def _handle_proxy(
 
     response_body = upstream_resp.content
     response_text = upstream_resp.text
-    filtered = False
-    filter_details: dict | None = None
-
-    # 응답 필터 — 민감 정보 [REDACTED] 치환
-    if settings.filter_enabled and upstream_resp.status_code == 200:
-        response_rules = await content_filter.load_rules(db, service, direction="response")
-        if response_rules:
-            filter_result = content_filter.apply(response_rules, response_text)
-            if not filter_result.passed:
-                filtered = True
-                filter_details = {
-                    "direction": "response",
-                    "matches": [
-                        {
-                            "rule_id": m.rule_id,
-                            "rule_name": m.rule_name,
-                            "rule_type": m.rule_type,
-                            "matched_text": m.matched_text,
-                        }
-                        for m in filter_result.matches
-                    ],
-                }
-                response_text = content_filter.redact(response_rules, response_text)
-                response_body = response_text.encode("utf-8")
 
     # 검색 로그 저장
-    request_body_json = _parse_request_body(original_body, request.url.query)
+    request_body_json = _parse_request_body(body, request.url.query)
 
     response_body_json = None
     try:
@@ -166,20 +138,10 @@ async def _handle_proxy(
         request_body=request_body_json,
         response_status=upstream_resp.status_code,
         response_body=response_body_json,
-        filtered=filtered,
-        filter_details=filter_details,
+        filtered=False,
+        filter_details=None,
     )
     db.add(log)
-
-    audit_details: dict = {"method": request.method, "filtered": filtered}
-    if filtered and filter_details:
-        matches = filter_details.get("matches", [])
-        audit_details["filter_rules"] = list({m["rule_name"] for m in matches})
-        audit_details["filter_texts"] = [
-            {"rule": m["rule_name"], "text": m["matched_text"]}
-            for m in matches
-        ]
-        audit_details["match_count"] = len(matches)
 
     audit = AuditTrail(
         user_id=user.user_id,
@@ -187,7 +149,7 @@ async def _handle_proxy(
         action="search",
         resource_type="proxy",
         resource_id=f"{service}/{path}",
-        details=audit_details,
+        details={"method": request.method},
     )
     db.add(audit)
     await db.commit()

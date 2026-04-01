@@ -79,32 +79,11 @@ class TestKeywordFilter:
         assert result.passed
 
 
-class TestRedact:
-    def test_redacts_ssn(self, filter_engine: ContentFilter) -> None:
-        rule = _make_rule("regex", r"\d{6}-[1-4]\d{6}", "주민등록번호")
-        content = "번호: 900101-1234567"
-        redacted = filter_engine.redact([rule], content)
-        assert "900101-1234567" not in redacted
-        assert "[REDACTED]" in redacted
-
-    def test_redacts_keyword(self, filter_engine: ContentFilter) -> None:
-        rule = _make_rule("keyword", "password", "비밀번호")
-        content = "The Password is admin123"
-        redacted = filter_engine.redact([rule], content)
-        assert "Password" not in redacted
-        assert "[REDACTED]" in redacted
-
-
 class TestDirection:
     def test_request_direction_rule(self, filter_engine: ContentFilter) -> None:
         rule = _make_rule("keyword", "password", "요청필터", direction="request")
         result = filter_engine.apply([rule], "my password is 123")
         assert not result.passed
-
-    def test_response_direction_rule(self, filter_engine: ContentFilter) -> None:
-        rule = _make_rule("regex", r"\d{6}-[1-4]\d{6}", "응답필터", direction="response")
-        redacted = filter_engine.redact([rule], "SSN: 900101-1234567")
-        assert "[REDACTED]" in redacted
 
     def test_both_direction_rule(self, filter_engine: ContentFilter) -> None:
         rule = _make_rule("keyword", "secret", "양방향", direction="both")

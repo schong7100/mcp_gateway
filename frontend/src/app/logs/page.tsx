@@ -95,7 +95,7 @@ export default function LogsPage() {
               checked={filteredOnly}
               onChange={handleFilteredOnlyChange}
             />
-            차단된 항목만
+            차단된 요청만
           </label>
           {data && (
             <span className="ml-auto text-sm text-gray-500">
@@ -112,7 +112,7 @@ export default function LogsPage() {
               <th className="px-6 py-3 text-left font-medium text-gray-500">서비스</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">검색 내용</th>
               <th className="px-6 py-3 text-left font-medium text-gray-500">상태</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500">필터</th>
+              <th className="px-6 py-3 text-left font-medium text-gray-500">차단 사유</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -184,7 +184,7 @@ export default function LogsPage() {
                         </div>
                       ) : log.filtered ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-                          차단됨
+                          필터 차단
                         </span>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>

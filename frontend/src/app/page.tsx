@@ -64,7 +64,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-sm font-medium text-gray-500">활성 필터 규칙</h2>
+          <h2 className="text-sm font-medium text-gray-500">활성 차단 규칙</h2>
           <p className="text-3xl font-bold mt-2">
             {loading ? '...' : stats?.active_rules ?? 0}
           </p>
