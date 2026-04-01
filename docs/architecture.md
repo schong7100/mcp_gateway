@@ -50,12 +50,12 @@ MCP Gateway는 **URL Redirect 방식 (Reverse Proxy)** 을 채택합니다.
 │  │  FastAPI :8000                                               │    │
 │  │                                                              │    │
 │  │  ┌─────────────┐   ┌──────────────┐   ┌──────────────────┐ │    │
-│  │  │  API Key    │──►│  요청 마스킹  │──►│  Reverse Proxy   │ │    │
+│  │  │  API Key    │──►│  요청 필터  │──►│  Reverse Proxy   │ │    │
 │  │  │  인증       │   │  필터        │   │  (httpx)         │ │    │
 │  │  └─────────────┘   └──────────────┘   └────────┬─────────┘ │    │
 │  │                                                 │           │    │
 │  │                                        ┌────────▼─────────┐ │    │
-│  │                                        │  응답 마스킹      │ │    │
+│  │                                        │  응답 필터      │ │    │
 │  │                                        │  필터            │ │    │
 │  │                                        └────────┬─────────┘ │    │
 │  │                                                 │           │    │
@@ -83,7 +83,7 @@ MCP Gateway는 **URL Redirect 방식 (Reverse Proxy)** 을 채택합니다.
 
 ## 3. 요청 처리 흐름
 
-### 3.1 정상 검색 (마스킹 없음)
+### 3.1 정상 검색 (차단 없음)
 
 ```
 Developer ──► POST /proxy/c7/v2/libs/search?query=fastapi
@@ -94,7 +94,7 @@ Developer ──► POST /proxy/c7/v2/libs/search?query=fastapi
                └────┬────┘
                     │ valid (client_ip 추출)
                ┌────┴──────────┐
-               │요청 마스킹 필터│──── 민감정보 없음 ──► pass
+               │요청 필터 필터│──── 민감정보 없음 ──► pass
                └────┬──────────┘
                     │
                ┌────┴──────────┐
@@ -103,7 +103,7 @@ Developer ──► POST /proxy/c7/v2/libs/search?query=fastapi
                └────┬──────────┘
                     │
                ┌────┴──────────┐
-               │응답 마스킹 필터│──── 민감정보 없음 ──► pass
+               │응답 필터 필터│──── 민감정보 없음 ──► pass
                └────┬──────────┘
                     │
                ┌────┴────┐
@@ -114,7 +114,7 @@ Developer ──► POST /proxy/c7/v2/libs/search?query=fastapi
 Developer ◄── 200 OK + 검색 결과
 ```
 
-### 3.2 민감정보 포함 검색 (마스킹 적용)
+### 3.2 민감정보 포함 검색 (차단 적용)
 
 ```
 Developer ──► GET /proxy/exa/search?query=10.10.20.30+서버+에러
@@ -124,35 +124,35 @@ Developer ──► GET /proxy/exa/search?query=10.10.20.30+서버+에러
                └────┬────┘
                     │
                ┌────┴──────────┐
-               │요청 마스킹 필터│
-               │               │── 사설IP 패턴 매치 ──► "[REDACTED]+서버+에러"
+               │요청 필터 필터│
+               │               │── 사설IP 패턴 매치 ──► "차단+서버+에러"
                │ 원본 텍스트   │
                │ 기록 후 치환  │
                └────┬──────────┘
-                    │ (마스킹된 쿼리로 전달)
+                    │ (차단된 쿼리로 전달)
                ┌────┴──────────┐
-               │ Reverse Proxy │──► api.exa.ai/search?query=[REDACTED]+서버+에러
+               │ Reverse Proxy │──► api.exa.ai/search?query=차단+서버+에러
                └────┬──────────┘
                     │
                ┌────┴──────────┐
-               │응답 마스킹 필터│──── 응답 내 IP 패턴 치환
+               │응답 필터 필터│──── 응답 내 IP 패턴 치환
                └────┬──────────┘
                     │
                ┌────┴────┐
                │  DB 로그 │──► search_logs (filtered=true, filter_details 포함)
-               └────┬────┘    audit_trail (action=search, masking_applied=true)
+               └────┬────┘    audit_trail (action=search, filter_blocked=true)
                     │
                     ▼
-Developer ◄── 200 OK + 검색 결과 (IP 마스킹된 상태)
-              (마스킹 사실 알림 없음)
+Developer ◄── 200 OK + 검색 결과 (IP 차단된 상태)
+              (차단 사실 알림 없음)
 ```
 
 ---
 
-## 4. 마스킹 필터 파이프라인
+## 4. 차단 필터 파이프라인
 
 ```
-┌─── 요청 마스킹 ──────────────────────────────────────────────────┐
+┌─── 요청 필터 ──────────────────────────────────────────────────┐
 │                                                                   │
 │  요청 쿼리/본문 ──► regex 규칙 적용 ──► 매칭된 텍스트 치환       │
 │                ──► keyword 규칙 적용 ──► 매칭된 단어 치환         │
@@ -161,12 +161,12 @@ Developer ◄── 200 OK + 검색 결과 (IP 마스킹된 상태)
 │  치환된 쿼리 ──► 업스트림 전달                                    │
 └───────────────────────────────────────────────────────────────────┘
 
-┌─── 응답 마스킹 ──────────────────────────────────────────────────┐
+┌─── 응답 필터 ──────────────────────────────────────────────────┐
 │                                                                   │
 │  응답 본문 ──► regex 규칙 적용 (response/both 방향)               │
 │           ──► keyword 규칙 적용 (response/both 방향)              │
 │                                                                   │
-│  마스킹된 응답 ──► 개발자에게 전달                                │
+│  차단된 응답 ──► 개발자에게 전달                                │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -231,16 +231,16 @@ Developer ◄── 200 OK + 검색 결과 (IP 마스킹된 상태)
      │
      ├── search_logs 레코드 생성
      │   ├── user_name: 클라이언트 IP
-     │   ├── request_body: 원본 검색어 (마스킹 전)
+     │   ├── request_body: 원본 검색어 (차단 전)
      │   ├── filtered: true/false
      │   └── filter_details: { matches: [{ rule_name, matched_text }] }
      │
      └── audit_trail 레코드 생성
          ├── action: "search"
-         ├── details.masking_applied: true/false
+         ├── details.filter_blocked: true/false
          └── details.masked_rules: ["사설 IP 대역", ...]
 
-마스킹 규칙 변경 발생
+차단 규칙 변경 발생
      │
      └── audit_trail 레코드 생성
          ├── action: "filter_create" / "filter_update" / "filter_delete"
@@ -264,7 +264,7 @@ Developer ◄── 200 OK + 검색 결과 (IP 마스킹된 상태)
 │  │  API Key → 개발자 PC 접근 허용 (프록시 엔드포인트만)      │   │
 │  │  JWT → 보안 담당자 접근 허용 (전체 API)                   │   │
 │  │                                                         │   │
-│  │  마스킹 필터 → 외부 전송 전 민감정보 제거                  │   │
+│  │  차단 필터 → 외부 전송 전 민감정보 제거                  │   │
 │  │  DB → 원본 기록 (내부 네트워크만 접근 가능)               │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
@@ -278,7 +278,7 @@ Developer ◄── 200 OK + 검색 결과 (IP 마스킹된 상태)
 |------|------|------|
 | 지원 서비스 | Context7, Exa | 추가 MCP 서비스 (`/proxy/{service}/*`) |
 | 인증 | API Key + Keycloak | LDAP 연동 고려 |
-| 마스킹 | Regex + Keyword | ML 기반 민감정보 탐지 |
+| 차단 | Regex + Keyword | ML 기반 민감정보 탐지 |
 | 모니터링 | 자체 로그 | Prometheus/Grafana 연동 |
 | HA | 단일 VM | 다중 인스턴스 + 로드밸런서 |
 
@@ -291,7 +291,7 @@ Developer ◄── 200 OK + 검색 결과 (IP 마스킹된 상태)
 | 제품 명세서 | `docs/product-specification.md` |
 | 보안 담당자 매뉴얼 | `docs/security-officer-manual.md` |
 | 개발자 공지 | `docs/developer-notice.md` |
-| 마스킹 규칙 가이드라인 | `docs/filter_rules.md` |
+| 차단 규칙 가이드라인 | `docs/filter_rules.md` |
 | 개발자 설정 가이드 | `docs/developer-setup.md` |
 | AI 개발 워크플로우 | `AGENTS.md` |
 | Stitch 다이어그램 | `architecture/README.md` |
