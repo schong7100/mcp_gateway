@@ -289,9 +289,10 @@ Developer ◄── 200 OK + 검색 결과 (IP 차단된 상태)
 | 문서 | 위치 |
 |------|------|
 | 제품 명세서 | `docs/product-specification.md` |
+| Gateway 서버 구축 가이드 | `docs/gateway-setup.md` |
+| 개발자 PC 설정 가이드 | `docs/developer-setup.md` |
 | 보안 담당자 매뉴얼 | `docs/security-officer-manual.md` |
 | 개발자 공지 | `docs/developer-notice.md` |
 | 차단 규칙 가이드라인 | `docs/filter_rules.md` |
-| 개발자 설정 가이드 | `docs/developer-setup.md` |
+| 보안 아키텍처 | `architecture/04-security-agent.md` |
 | AI 개발 워크플로우 | `AGENTS.md` |
-| Stitch 다이어그램 | `architecture/README.md` |

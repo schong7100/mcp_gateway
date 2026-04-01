@@ -100,27 +100,26 @@ Oracle DB TNS Listener ORA-12541 에러 해결 방법
 
 ## 🔧 개발자 PC 설정 방법
 
-### opencode 설정 (`~/.config/opencode/opencode.json`)
+### opencode 설정 (`%APPDATA%\opencode\opencode.json`)
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "context7": {
       "type": "local",
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"],
-      "env": {
+      "command": ["npx", "-y", "@upstash/context7-mcp"],
+      "environment": {
         "CONTEXT7_API_URL": "http://{gateway-host}:8000/proxy/c7",
-        "CONTEXT7_API_KEY": "{발급받은-API-KEY}"
+        "CONTEXT7_API_KEY": "{발급받은-API-KEY}",
+        "DEFAULT_MINIMUM_TOKENS": "5000"
       }
     },
     "exa": {
       "type": "local",
-      "command": "npx",
-      "args": ["-y", "exa-mcp-server"],
-      "env": {
-        "EXA_API_KEY": "{발급받은-API-KEY}",
-        "EXA_BASE_URL": "http://{gateway-host}:8000/proxy/exa"
+      "command": ["exa-mcp-server"],
+      "environment": {
+        "EXA_BASE_URL": "http://{gateway-host}:8000/proxy/exa",
+        "EXA_API_KEY": "{발급받은-API-KEY}"
       }
     }
   }
@@ -128,6 +127,7 @@ Oracle DB TNS Listener ORA-12541 에러 해결 방법
 ```
 
 > `{gateway-host}`와 `{발급받은-API-KEY}`는 IT 담당자로부터 발급받습니다.
+> 기존 Nexus MCP 등 다른 설정이 있다면 `"mcp"` 안에 항목만 추가하세요.
 
 ---
 
