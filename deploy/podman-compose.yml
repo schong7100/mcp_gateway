@@ -26,10 +26,10 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER:-mcp}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-mcp}
       KC_DB_SCHEMA: keycloak
-      KC_PROXY_HEADERS: xforwarded
-      KC_HTTP_ENABLED: "true"
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+      - "18080:8080"
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     command: start-dev --import-realm --health-enabled=true
@@ -48,6 +48,8 @@ services:
       context: ..
       dockerfile: deploy/Containerfile.backend
     env_file: .env
+    ports:
+      - "18000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,29 +63,16 @@ services:
       context: ..
       dockerfile: deploy/Containerfile.frontend
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://localhost:18000}
-        NEXT_PUBLIC_KEYCLOAK_URL: ${NEXT_PUBLIC_KEYCLOAK_URL:-https://localhost:18080}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:18000}
+        NEXT_PUBLIC_KEYCLOAK_URL: ${NEXT_PUBLIC_KEYCLOAK_URL:-http://localhost:18080}
         NEXT_PUBLIC_KEYCLOAK_REALM: ${NEXT_PUBLIC_KEYCLOAK_REALM:-mcp-gateway}
         NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${NEXT_PUBLIC_KEYCLOAK_CLIENT_ID:-mcp-gateway-web}
         NEXT_PUBLIC_DEV_MODE: ${NEXT_PUBLIC_DEV_MODE:-false}
     env_file: .env
-    depends_on:
-      - backend
-
-  nginx:
-    image: docker.io/library/nginx:alpine
     ports:
-      - "13000:13000"
-      - "18000:18000"
-      - "18080:18080"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./tls:/etc/nginx/tls:ro
+      - "13000:3000"
     depends_on:
-      - frontend
       - backend
-      - keycloak
-    restart: unless-stopped
 
 volumes:
   pgdata:

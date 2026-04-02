@@ -66,14 +66,14 @@
       "serviceAccountsEnabled": false,
       "redirectUris": [
         "http://localhost:3000/*",
-        "http://localhost:3000",
-        "https://10.1.10.188:13000/*",
-        "https://10.1.10.188:13000"
+        "http://localhost:3000"
       ],
       "webOrigins": [
-        "http://localhost:3000",
-        "https://10.1.10.188:13000"
+        "http://localhost:3000"
       ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
       "protocolMappers": [
         {
           "name": "audience-mcp-gateway-api",
