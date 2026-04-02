@@ -195,21 +195,24 @@ export default function DashboardPage() {
                   <YAxis
                     type="category"
                     dataKey="user_name"
-                    tick={({ x, y, payload, index }: { x: number; y: number; payload: { value: string }; index: number }) => (
-                      <text
-                        x={x}
-                        y={y}
-                        dy={4}
-                        textAnchor="end"
-                        fontSize={12}
-                        fontWeight={index < 3 ? 700 : 400}
-                        fill={index < 3 ? '#ef4444' : '#6b7280'}
-                        className="cursor-pointer"
-                        onClick={() => handleUserClick(payload.value)}
-                      >
-                        {payload.value}
-                      </text>
-                    )}
+                    tick={(props) => {
+                      const { x, y, payload, index } = props as { x: number; y: number; payload: { value: string }; index: number };
+                      return (
+                        <text
+                          x={x}
+                          y={y}
+                          dy={4}
+                          textAnchor="end"
+                          fontSize={12}
+                          fontWeight={index < 3 ? 700 : 400}
+                          fill={index < 3 ? '#ef4444' : '#6b7280'}
+                          className="cursor-pointer"
+                          onClick={() => handleUserClick(payload.value)}
+                        >
+                          {payload.value}
+                        </text>
+                      );
+                    }}
                     width={70}
                   />
                   <Tooltip formatter={(value) => [`${value}건`, '차단 수']} />
