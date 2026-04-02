@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mcp}
       POSTGRES_DB: ${POSTGRES_DB:-mcp_gateway}
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +28,7 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
     ports:
-      - "8080:8080"
+      - "18080:8080"
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     command: start-dev --import-realm
@@ -48,7 +48,7 @@ services:
       dockerfile: deploy/Containerfile.backend
     env_file: .env
     ports:
-      - "8000:8000"
+      - "18000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,7 +63,7 @@ services:
       dockerfile: deploy/Containerfile.frontend
     env_file: .env
     ports:
-      - "3000:3000"
+      - "13000:3000"
     depends_on:
       - backend
 

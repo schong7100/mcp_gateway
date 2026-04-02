@@ -13,7 +13,7 @@
 | Node.js | 20 이상 (Nexus에서 설치) |
 | opencode | CLI 설치 완료 |
 | npm registry | Nexus 프록시 설정 완료 (`npm config get registry`로 확인) |
-| 네트워크 | MCP Gateway 서버 접근 가능 (`http://<gateway-ip>:8000`) |
+| 네트워크 | MCP Gateway 서버 접근 가능 (`http://<gateway-ip>:18000`) |
 
 ---
 
@@ -72,7 +72,7 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
       "type": "local",
       "command": ["npx", "-y", "@upstash/context7-mcp"],
       "environment": {
-        "CONTEXT7_API_URL": "http://<gateway-ip>:8000/proxy/c7",
+        "CONTEXT7_API_URL": "http://<gateway-ip>:18000/proxy/c7",
         "CONTEXT7_API_KEY": "727a17912b5c1b79564ba42e59b47ae17dc65c82df35717adb14e75d0bb27b0b",
         "DEFAULT_MINIMUM_TOKENS": "5000"
       }
@@ -81,7 +81,7 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
       "type": "local",
       "command": ["exa-mcp-server"],
       "environment": {
-        "EXA_BASE_URL": "http://<gateway-ip>:8000/proxy/exa",
+        "EXA_BASE_URL": "http://<gateway-ip>:18000/proxy/exa",
         "EXA_API_KEY": "727a17912b5c1b79564ba42e59b47ae17dc65c82df35717adb14e75d0bb27b0b"
       }
     }

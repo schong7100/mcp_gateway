@@ -109,7 +109,7 @@ Oracle DB TNS Listener ORA-12541 에러 해결 방법
       "type": "local",
       "command": ["npx", "-y", "@upstash/context7-mcp"],
       "environment": {
-        "CONTEXT7_API_URL": "http://{gateway-host}:8000/proxy/c7",
+        "CONTEXT7_API_URL": "http://{gateway-host}:18000/proxy/c7",
         "CONTEXT7_API_KEY": "{발급받은-API-KEY}",
         "DEFAULT_MINIMUM_TOKENS": "5000"
       }
@@ -118,7 +118,7 @@ Oracle DB TNS Listener ORA-12541 에러 해결 방법
       "type": "local",
       "command": ["exa-mcp-server"],
       "environment": {
-        "EXA_BASE_URL": "http://{gateway-host}:8000/proxy/exa",
+        "EXA_BASE_URL": "http://{gateway-host}:18000/proxy/exa",
         "EXA_API_KEY": "{발급받은-API-KEY}"
       }
     }

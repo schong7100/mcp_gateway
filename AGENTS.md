@@ -215,16 +215,16 @@ docs/              # Developer setup guides
 │  개발자 PC (Windows 11, 폐쇄망)                                │
 │                                                                │
 │  opencode ──► context7-mcp (stdio)                            │
-│               CONTEXT7_API_URL → http://gateway:8000/proxy/c7 │
+│               CONTEXT7_API_URL → http://gateway:18000/proxy/c7 │
 │  opencode ──► exa-mcp-server (stdio)                          │
-│               EXA_BASE_URL → http://gateway:8000/proxy/exa    │
+│               EXA_BASE_URL → http://gateway:18000/proxy/exa    │
 └──────────────────────┬────────────────────────────────────────┘
                        │ HTTP (outbound only)
                        ▼
 ┌───────────────────────────────────────────────────────────────┐
 │  MCP Gateway (RHEL VM, Podman)                                │
 │                                                                │
-│  FastAPI :8000                                                │
+│  FastAPI :18000                                                │
 │  ├── Auth ─► Keycloak JWT 검증                                │
 │  ├── Request Filter ─► 민감정보 포함 시 403 차단              │
 │  ├── Reverse Proxy ─► /proxy/c7/*, /proxy/exa/*               │
@@ -234,11 +234,11 @@ docs/              # Developer setup guides
 │  ├── /api/v1/audit ─► 감사 로그 조회                          │
 │  └── /api/v1/users ─► 사용자 관리 (Keycloak Admin API)       │
 │                                                                │
-│  Next.js :3000 ─► 보안 담당자 모니터링 포털                   │
+│  Next.js :13000 ─► 보안 담당자 모니터링 포털                   │
 │  ├── 대시보드, 검색 로그, 필터 관리, 감사 로그, 사용자 관리   │
 │                                                                │
-│  PostgreSQL :5432 ─► search_logs, filter_rules, audit_trail   │
-│  Keycloak :8080 ─► 단독 IDP (admin/viewer roles)              │
+│  PostgreSQL :15432 ─► search_logs, filter_rules, audit_trail   │
+│  Keycloak :18080 ─► 단독 IDP (admin/viewer roles)              │
 └──────────────────────┬────────────────────────────────────────┘
                        │ HTTPS (outbound only, firewall allowed)
                        ▼

@@ -45,17 +45,17 @@
 │  개발자 PC (Windows 11, 폐쇄망)                                  │
 │                                                                  │
 │  opencode ──► context7-mcp (stdio)                              │
-│               CONTEXT7_API_URL=http://gateway:8000/proxy/c7     │
+│               CONTEXT7_API_URL=http://gateway:18000/proxy/c7     │
 │                                                                  │
 │  opencode ──► exa-mcp-server (stdio)                            │
-│               EXA_BASE_URL=http://gateway:8000/proxy/exa        │
+│               EXA_BASE_URL=http://gateway:18000/proxy/exa        │
 └──────────────────────────┬───────────────────────────────────────┘
                            │ HTTP (아웃바운드 전용)
                            ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  MCP Gateway (RHEL VM, Podman 컨테이너)                          │
 │                                                                  │
-│  FastAPI :8000                                                   │
+│  FastAPI :18000                                                   │
 │  ├── 인증 ─► API Key 검증 (개발자 PC)                            │
 │  ├── 차단 필터 ─► 요청에서 민감 정보 403 차단           │
 │  ├── 리버스 프록시 ─► /proxy/c7/*, /proxy/exa/*                  │
@@ -65,9 +65,9 @@
 │  ├── /api/v1/audit ─► 감사 로그 조회                             │
 │  └── /api/v1/users ─► 사용자 관리 (Keycloak 연동)               │
 │                                                                  │
-│  Next.js :3000 ─► 보안 담당자 모니터링 포털                      │
-│  PostgreSQL :5432 ─► 검색 로그, 차단 규칙, 감사 로그           │
-│  Keycloak :8080 ─► 단독 IDP (포털 관리자 전용)                   │
+│  Next.js :13000 ─► 보안 담당자 모니터링 포털                      │
+│  PostgreSQL :15432 ─► 검색 로그, 차단 규칙, 감사 로그           │
+│  Keycloak :18080 ─► 단독 IDP (포털 관리자 전용)                   │
 └──────────────────────────┬───────────────────────────────────────┘
                            │ HTTPS (아웃바운드 전용, 방화벽 허용)
                            ▼

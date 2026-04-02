@@ -32,22 +32,22 @@ MCP Gateway는 **URL Redirect 방식 (Reverse Proxy)** 을 채택합니다.
 │  │  opencode (AI 코딩 어시스턴트)                                │   │
 │  │                                                              │   │
 │  │  ├── context7-mcp (stdio process)                           │   │
-│  │  │   CONTEXT7_API_URL=http://gateway:8000/proxy/c7         │   │
+│  │  │   CONTEXT7_API_URL=http://gateway:18000/proxy/c7         │   │
 │  │  │   CONTEXT7_API_KEY={api-key}                            │   │
 │  │  │                                                          │   │
 │  │  └── exa-mcp-server (stdio process)                        │   │
 │  │      EXA_API_KEY={api-key}                                 │   │
-│  │      EXA_BASE_URL=http://gateway:8000/proxy/exa            │   │
+│  │      EXA_BASE_URL=http://gateway:18000/proxy/exa            │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────┬───────────────────────────────────────┘
                                │ HTTP (아웃바운드 전용)
-                               │ port 8000
+                               │ port 18000
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  MCP Gateway (RHEL VM, Podman)                                       │
 │                                                                      │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  FastAPI :8000                                               │    │
+│  │  FastAPI :18000                                               │    │
 │  │                                                              │    │
 │  │  ┌─────────────┐   ┌──────────────┐   ┌──────────────────┐ │    │
 │  │  │  API Key    │──►│  요청 필터  │──►│  Reverse Proxy   │ │    │
@@ -67,7 +67,7 @@ MCP Gateway는 **URL Redirect 방식 (Reverse Proxy)** 을 채택합니다.
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
-│  │  Next.js :3000  │  │  PostgreSQL :5432 │  │  Keycloak :8080  │   │
+│  │  Next.js :13000  │  │  PostgreSQL :15432 │  │  Keycloak :18080  │   │
 │  │  보안 포털      │  │  로그/규칙/감사  │  │  포털 IDP        │   │
 │  └─────────────────┘  └──────────────────┘  └──────────────────┘   │
 └──────────────────────────────┬───────────────────────────────────────┘
@@ -180,7 +180,7 @@ Developer ◄── 200 OK + 검색 결과 (IP 차단된 상태)
 │                                                                 │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   │
 │  │ postgres │   │ keycloak │   │ backend  │   │ frontend │   │
-│  │ :5432    │   │ :8080    │   │ :8000    │   │ :3000    │   │
+│  │ :15432   │   │ :18080   │   │ :18000   │   │ :13000   │   │
 │  │          │   │          │   │          │   │          │   │
 │  │ RHEL UBI9│   │ RHEL UBI9│   │ RHEL UBI9│   │ RHEL UBI9│   │
 │  └──────────┘   └──────────┘   └──────────┘   └──────────┘   │
@@ -196,10 +196,10 @@ Developer ◄── 200 OK + 검색 결과 (IP 차단된 상태)
 
 | 서비스 | 베이스 이미지 | 포트 |
 |--------|-------------|------|
-| postgres | `postgres:15-alpine` | 5432 |
-| keycloak | `quay.io/keycloak/keycloak:23` | 8080 |
-| backend | `registry.access.redhat.com/ubi9/python-311` | 8000 |
-| frontend | `registry.access.redhat.com/ubi9/nodejs-20` | 3000 |
+| postgres | `postgres:15-alpine` | 15432 |
+| keycloak | `quay.io/keycloak/keycloak:23` | 18080 |
+| backend | `registry.access.redhat.com/ubi9/python-311` | 18000 |
+| frontend | `registry.access.redhat.com/ubi9/nodejs-20` | 13000 |
 
 ---
 

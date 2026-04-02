@@ -36,9 +36,9 @@ git --version
 
 ```bash
 # 인바운드: 개발자 PC → Gateway (사내망)
-sudo firewall-cmd --permanent --add-port=8000/tcp   # Backend API
-sudo firewall-cmd --permanent --add-port=3000/tcp   # Frontend 포털
-sudo firewall-cmd --permanent --add-port=8080/tcp   # Keycloak (포털 인증)
+sudo firewall-cmd --permanent --add-port=18000/tcp   # Backend API
+sudo firewall-cmd --permanent --add-port=13000/tcp   # Frontend 포털
+sudo firewall-cmd --permanent --add-port=18080/tcp   # Keycloak (포털 인증)
 
 # 아웃바운드: Gateway → 외부 서비스 (인터넷)
 # 방화벽 정책에서 아래 도메인 HTTPS(443) 아웃바운드 허용 필요:
@@ -101,8 +101,8 @@ MCP_GATEWAY_KEYCLOAK_ADMIN_CLIENT_SECRET=mcp-gateway-admin-secret
 # MCP_GATEWAY_HTTPS_PROXY=http://proxy.corp.example:8080
 
 # ─── Frontend ───
-NEXT_PUBLIC_API_URL=http://<이_서버_IP>:8000
-NEXT_PUBLIC_KEYCLOAK_URL=http://<이_서버_IP>:8080
+NEXT_PUBLIC_API_URL=http://<이_서버_IP>:18000
+NEXT_PUBLIC_KEYCLOAK_URL=http://<이_서버_IP>:18080
 NEXT_PUBLIC_KEYCLOAK_REALM=mcp-gateway
 NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=mcp-gateway-web
 NEXT_PUBLIC_DEV_MODE=false
@@ -147,14 +147,14 @@ deploy_frontend_1   Up
 
 ```bash
 # Backend 헬스체크
-curl -sf http://localhost:8000/health
+curl -sf http://localhost:18000/health
 # 기대 결과: {"status":"ok"}
 
 # Frontend 접속 확인
-curl -sf http://localhost:3000 -o /dev/null && echo "OK"
+curl -sf http://localhost:13000 -o /dev/null && echo "OK"
 
 # Keycloak 확인
-curl -sf http://localhost:8080/realms/mcp-gateway/.well-known/openid-configuration | head -1
+curl -sf http://localhost:18080/realms/mcp-gateway/.well-known/openid-configuration | head -1
 
 # DB 접속 확인
 podman exec deploy_postgres_1 psql -U mcp -d mcp_gateway -c "SELECT count(*) FROM filter_rules;"
@@ -167,7 +167,7 @@ podman exec deploy_postgres_1 psql -U mcp -d mcp_gateway -c "SELECT count(*) FRO
 
 ### 6.1 관리자 콘솔 접속
 
-1. 브라우저에서 `http://<서버IP>:8080` 접속
+1. 브라우저에서 `http://<서버IP>:18080` 접속
 2. `.env`에 설정한 `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`로 로그인
 
 ### 6.2 포털 관리자 계정 생성
@@ -235,7 +235,7 @@ podman exec deploy_postgres_1 pg_dump -U mcp mcp_gateway > backup_$(date +%Y%m%d
 | Backend 시작 실패 | DB 연결 실패 | `.env`의 DB 비밀번호 확인, postgres 컨테이너 healthy 확인 |
 | Frontend 빈 화면 | `NEXT_PUBLIC_API_URL` 오류 | `.env`에서 실제 서버 IP로 설정했는지 확인 |
 | 외부 검색 timeout | 방화벽 아웃바운드 차단 | context7.com:443, api.exa.ai:443 허용 확인 |
-| 개발자 PC 연결 거부 | 방화벽 인바운드 차단 | 8000번 포트 인바운드 허용 확인 |
+| 개발자 PC 연결 거부 | 방화벽 인바운드 차단 | 18000번 포트 인바운드 허용 확인 |
 | `401 Unauthorized` (개발자) | API Key 불일치 | `.env`의 `MCP_GATEWAY_PROXY_API_KEY`와 개발자 설정 일치 확인 |
 | `401 Unauthorized` (포털) | Keycloak 토큰 만료 | 포털 로그아웃 후 재로그인 |
 
@@ -249,10 +249,10 @@ podman exec deploy_postgres_1 pg_dump -U mcp mcp_gateway > backup_$(date +%Y%m%d
 - [ ] DB 비밀번호를 기본값(`mcp`)에서 변경
 - [ ] Keycloak 관리자 비밀번호를 기본값(`admin`)에서 변경
 - [ ] Proxy API Key를 충분히 긴 임의 문자열로 설정
-- [ ] 방화벽 인바운드: 사내망에서만 8000, 3000, 8080 접근 가능
+- [ ] 방화벽 인바운드: 사내망에서만 18000, 13000, 18080 접근 가능
 - [ ] 방화벽 아웃바운드: context7.com:443, api.exa.ai:443만 허용
-- [ ] 기본 필터 규칙 13개 시드 확인: `curl http://localhost:8000/api/v1/filters` (DEV_MODE 시)
-- [ ] 포털 로그인 정상 확인: `http://<서버IP>:3000`
+- [ ] 기본 필터 규칙 13개 시드 확인: `curl http://localhost:18000/api/v1/filters` (DEV_MODE 시)
+- [ ] 포털 로그인 정상 확인: `http://<서버IP>:13000`
 
 ---
 
