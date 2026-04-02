@@ -1,8 +1,41 @@
 # 보안 아키텍처 — 122B 페르소나 일반화 + Gateway 차단
 
-**버전**: 4.0  
+**버전**: 4.1  
 **작성일**: 2026-04-01  
-**변경 이력**: v1 별도 7B Agent (폐기) → v2 자산 목록 (폐기) → v3 Gateway 마스킹 (폐기) → v4 페르소나 일반화 + Gateway 차단 (현행)
+**변경 이력**: v1 별도 7B Agent (폐기) → v2 자산 목록 (폐기) → v3 Gateway 마스킹 (폐기) → v4 페르소나 일반화 + Gateway 차단 (현행) → v4.1 CLAUDE.md + skill 이원화 구조 (현행)
+
+---
+
+## 0. 페르소나 구성 이원화 (v4.1 추가)
+
+`CLAUDE.md` 단일 파일에서 **CLAUDE.md (원칙) + skill 파일 (절차)** 이원화 구조로 개선.
+
+### 역할 분리
+
+| 파일 | 로딩 방식 | 역할 | 분량 |
+|------|----------|------|------|
+| `CLAUDE.md` | 항상 자동 로딩 | 보안 정체성 + 핵심 원칙 (헌법) | 짧고 선언적 |
+| `.claude/skills/security-search-review.md` | 외부 검색 시 on-demand | 쿼리 보안 검토 절차 (매뉴얼) | 상세 절차 |
+| `.claude/skills/security-code-review.md` | 코드 리뷰 시 on-demand | 민감정보 탐지 절차 | 상세 절차 |
+| `.claude/skills/security-incident.md` | 차단 발생 시 on-demand | 대응 절차 | 상세 절차 |
+
+### 파일 구조
+
+```
+개발자 PC (opencode 프로젝트 루트)
+├── CLAUDE.md                              ← 항상 로딩: 원칙만
+└── .claude/
+    └── skills/
+        ├── security-search-review.md      ← 외부 검색 시
+        ├── security-code-review.md        ← 코드 리뷰 시
+        └── security-incident.md           ← 차단 대응 시
+```
+
+### 개선 이유
+
+- **컨텍스트 효율**: 코드 리팩토링 중에도 검색 필터 지침이 로딩되던 낭비 제거
+- **역할 확장**: 새 보안 시나리오 추가 시 skill 파일만 추가 (CLAUDE.md 비대화 방지)
+- **유지보수**: 원칙(CLAUDE.md)과 절차(skill) 독립 관리/배포
 
 ---
 

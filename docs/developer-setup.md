@@ -115,18 +115,24 @@ icacls "C:\opencode\security\*" /deny "%USERNAME%:(W,D,DC)" /T
 
 # 3. CLAUDE.md 심볼릭 링크 (프로젝트 루트에 연결)
 mklink "C:\Users\%USERNAME%\projects\CLAUDE.md" "C:\opencode\security\CLAUDE.md"
+
+# 4. .claude/skills/ 심볼릭 링크 (on-demand 보안 스킬)
+mkdir "C:\Users\%USERNAME%\projects\.claude" 2>NUL
+mklink /D "C:\Users\%USERNAME%\projects\.claude\skills" "C:\opencode\security\.claude\skills"
 ```
 
 ### 수동 배포 (심볼릭 링크 불가 시)
 
-보안 담당자에게 `CLAUDE.md` 파일을 전달받아 프로젝트 루트에 복사합니다.
+보안 담당자에게 `CLAUDE.md` 파일과 `.claude/skills/` 디렉토리를 전달받아 프로젝트에 복사합니다.
 
 ```powershell
-# 보안 담당자가 제공한 CLAUDE.md를 프로젝트 루트에 복사
+# 보안 담당자가 제공한 파일을 프로젝트에 복사
 copy \\fileserver\security\CLAUDE.md C:\Users\%USERNAME%\projects\CLAUDE.md
+xcopy /E /I \\fileserver\security\.claude\skills C:\Users\%USERNAME%\projects\.claude\skills
 
 # 읽기 전용 설정
 attrib +R "C:\Users\%USERNAME%\projects\CLAUDE.md"
+attrib +R "C:\Users\%USERNAME%\projects\.claude\skills\*" /S
 ```
 
 ### CLAUDE.md의 역할

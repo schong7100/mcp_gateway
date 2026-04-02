@@ -228,7 +228,53 @@ Keycloak에 등록된 포털 관리자 계정을 조회합니다.
 
 ---
 
-## 10. 문의 및 지원
+## 10. 보안 스킬 파일 관리
+
+### 개요
+
+개발자 PC의 보안 페르소나는 두 가지 파일 유형으로 구성됩니다:
+
+| 파일 | 위치 | 역할 | 로딩 |
+|------|------|------|------|
+| `CLAUDE.md` | 프로젝트 루트 | 핵심 원칙 (항상 적용) | 자동 |
+| skill 파일들 | `.claude/skills/` | 작업별 상세 절차 | on-demand |
+
+### 스킬 파일 종류
+
+| 파일명 | 적용 시점 | 내용 |
+|--------|----------|------|
+| `security-search-review.md` | 외부 검색(context7, exa) 전 | 쿼리 일반화 절차, 변환 기준 |
+| `security-code-review.md` | 코드 리뷰/PR 리뷰 | 민감정보 탐지, OWASP 체크리스트 |
+| `security-incident.md` | Gateway 403 차단 발생 시 | 대체 쿼리 생성, 반복 차단 대응 |
+
+### 스킬 파일 수정 방법
+
+1. 보안 정책 git 저장소 클론
+   ```
+   git clone https://internal-git/security/opencode-policy.git
+   ```
+2. 해당 skill 파일 수정 (`.claude/skills/*.md`)
+3. 검토 후 push → 개발자 PC에 자동 배포 (git pull 스케줄러)
+
+### 새 스킬 추가 시
+
+1. `.claude/skills/` 아래 새 `.md` 파일 생성
+2. 파일 상단 frontmatter 작성:
+   ```yaml
+   ---
+   name: security-{new-skill}
+   description: {스킬 설명}
+   triggers:
+     - {적용 시점1}
+     - {적용 시점2}
+   ---
+   ```
+3. `CLAUDE.md`의 "스킬 참조" 섹션에 추가
+4. 이 매뉴얼 스킬 파일 종류 표에 추가
+
+---
+
+## 11. 문의 및 지원
 
 - **시스템 장애**: IT 인프라 담당자
 - **규칙 정책 문의**: 정보보안팀
