@@ -94,7 +94,7 @@ MCP_GATEWAY_EXA_API_KEY=<exa-api-key>
 # ─── Keycloak 관리자 (포털 로그인용 — 반드시 변경) ───
 KEYCLOAK_ADMIN=admin
 KEYCLOAK_ADMIN_PASSWORD=<강력한_비밀번호>
-MCP_GATEWAY_KEYCLOAK_ADMIN_CLIENT_SECRET=<keycloak-client-secret>
+MCP_GATEWAY_KEYCLOAK_ADMIN_CLIENT_SECRET=mcp-gateway-admin-secret
 
 # ─── 프록시 (사내 프록시가 있는 경우만) ───
 # MCP_GATEWAY_HTTP_PROXY=http://proxy.corp.example:8080
@@ -181,12 +181,16 @@ podman exec deploy_postgres_1 psql -U mcp -d mcp_gateway -c "SELECT count(*) FRO
 4. Credentials 탭 → Set password (Temporary: OFF)
 5. Role Mappings → `admin` 역할 부여
 
-### 6.3 Client Secret 확인
+### 6.3 Client Secret
 
-1. Clients → `mcp-gateway-admin` 선택
-2. Credentials 탭 → Client Secret 복사
-3. `.env`의 `MCP_GATEWAY_KEYCLOAK_ADMIN_CLIENT_SECRET`에 설정
-4. `podman-compose restart backend`
+`MCP_GATEWAY_KEYCLOAK_ADMIN_CLIENT_SECRET`은 `realm-export.json`에 미리 정의되어 있습니다.
+Keycloak이 `--import-realm`으로 시작하면서 이 값을 그대로 사용하므로, `.env`에 아래 값을 설정하면 됩니다:
+
+```
+MCP_GATEWAY_KEYCLOAK_ADMIN_CLIENT_SECRET=mcp-gateway-admin-secret
+```
+
+> **참고**: `.env.example`에 이미 이 값이 포함되어 있습니다. `cp .env.example .env` 후 별도 수정 불필요.
 
 ---
 
