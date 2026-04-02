@@ -73,7 +73,7 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
       "command": ["npx", "-y", "@upstash/context7-mcp"],
       "environment": {
         "CONTEXT7_API_URL": "http://<gateway-ip>:8000/proxy/c7",
-        "CONTEXT7_API_KEY": "<proxy-api-key>",
+        "CONTEXT7_API_KEY": "727a17912b5c1b79564ba42e59b47ae17dc65c82df35717adb14e75d0bb27b0b",
         "DEFAULT_MINIMUM_TOKENS": "5000"
       }
     },
@@ -82,7 +82,7 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
       "command": ["exa-mcp-server"],
       "environment": {
         "EXA_BASE_URL": "http://<gateway-ip>:8000/proxy/exa",
-        "EXA_API_KEY": "<proxy-api-key>"
+        "EXA_API_KEY": "727a17912b5c1b79564ba42e59b47ae17dc65c82df35717adb14e75d0bb27b0b"
       }
     }
   }
@@ -91,7 +91,7 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
 
 **필수 변경:**
 - `<gateway-ip>`: MCP Gateway 서버 IP (IT 담당자에게 확인)
-- `<proxy-api-key>`: Gateway Proxy API Key (IT 담당자에게 발급)
+- Proxy API Key는 위 설정에 이미 포함되어 있습니다 (전 개발자 공통)
 
 > **참고**: `EXA_API_KEY`에도 Proxy API Key를 설정합니다. 실제 Exa API Key는 Gateway 서버에서 관리합니다.
 
@@ -147,11 +147,11 @@ attrib +R "C:\Users\%USERNAME%\projects\CLAUDE.md"
 개발자 PC의 MCP 서버는 **Proxy API Key**로 인증합니다.
 
 ```
-개발자 PC → context7-mcp → Authorization: Bearer <proxy-api-key>
+개발자 PC → context7-mcp → Authorization: Bearer 727a179...
                          → Gateway 인증 통과 → 외부 검색 실행
 ```
 
-- opencode.json의 `CONTEXT7_API_KEY`와 `EXA_API_KEY`에 동일한 Proxy API Key를 설정
+- opencode.json의 `CONTEXT7_API_KEY`와 `EXA_API_KEY`는 이미 설정되어 있음 (전 개발자 공통)
 - Gateway가 `Authorization: Bearer <key>` 또는 `X-API-Key: <key>`를 자동 검증
 - **Keycloak 계정은 불필요**합니다 (Keycloak은 보안 포털 관리자 전용)
 
@@ -196,7 +196,7 @@ AI가 Context7 또는 Exa MCP 도구를 사용하면:
 | 증상 | 원인 | 해결 |
 |------|------|------|
 | `Connection refused` | Gateway 미실행 또는 IP 오류 | `ping <gateway-ip>`, IT 담당자에게 확인 |
-| `401 Unauthorized` | API Key 불일치 | opencode.json의 `CONTEXT7_API_KEY`, `EXA_API_KEY` 확인 |
+| `401 Unauthorized` | API Key 불일치 | opencode.json의 API Key가 `727a179...`로 시작하는지 확인 |
 | `403 Blocked` | 민감정보 필터 차단 | 검색어에서 IP, 주민번호, 계정정보 등 제거 |
 | MCP 도구가 안 보임 | opencode 재시작 필요 | opencode 완전 종료 후 재시작 |
 | Exa 검색이 안됨 | Exa 패치 미적용 | 위 패치 절차 재실행, `$ExaPath` 내용에 `EXA_BASE_URL` 포함 확인 |

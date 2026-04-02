@@ -86,7 +86,7 @@ POSTGRES_DB=mcp_gateway
 MCP_GATEWAY_DATABASE_URL=postgresql+asyncpg://mcp:<강력한_비밀번호>@postgres:5432/mcp_gateway
 
 # ─── Proxy API Key (개발자 PC 인증용 — 반드시 변경) ───
-MCP_GATEWAY_PROXY_API_KEY=<임의의_긴_문자열>
+MCP_GATEWAY_PROXY_API_KEY=727a17912b5c1b79564ba42e59b47ae17dc65c82df35717adb14e75d0bb27b0b
 
 # ─── Exa API Key (exa.ai 서비스 인증) ───
 MCP_GATEWAY_EXA_API_KEY=<exa-api-key>
