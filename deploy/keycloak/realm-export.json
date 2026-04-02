@@ -1,6 +1,7 @@
 {
   "realm": "mcp-gateway",
   "enabled": true,
+  "sslRequired": "none",
   "displayName": "MCP Gateway",
   "accessTokenLifespan": 300,
   "ssoSessionMaxLifespan": 36000,
