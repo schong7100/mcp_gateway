@@ -84,7 +84,6 @@ export function KeycloakProvider({ children }: { children: React.ReactNode }) {
 
     kc.init({
       onLoad: 'login-required',
-      pkceMethod: 'S256',
       checkLoginIframe: false,
     })
       .then((authenticated) => {
