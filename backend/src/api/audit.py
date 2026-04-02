@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import CurrentUser, get_current_user
@@ -20,6 +20,10 @@ async def list_audit_trail(
     page_size: int = Query(default=50, ge=1, le=200),
     user_id: str | None = None,
     action: str | None = None,
+    start_time: str | None = Query(default=None, description="ISO format start time"),
+    end_time: str | None = Query(default=None, description="ISO format end time"),
+    resource_type: str | None = None,
+    detail: str | None = Query(default=None, description="상세 내용 검색 (JSONB 텍스트 검색)"),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AuditTrailListResponse:
@@ -27,11 +31,25 @@ async def list_audit_trail(
     count_stmt = select(func.count(AuditTrail.id))
 
     if user_id:
-        stmt = stmt.where(AuditTrail.user_id == user_id)
-        count_stmt = count_stmt.where(AuditTrail.user_id == user_id)
+        stmt = stmt.where(AuditTrail.user_name.ilike(f"%{user_id}%"))
+        count_stmt = count_stmt.where(AuditTrail.user_name.ilike(f"%{user_id}%"))
     if action:
         stmt = stmt.where(AuditTrail.action == action)
         count_stmt = count_stmt.where(AuditTrail.action == action)
+    if start_time:
+        start_dt = datetime.fromisoformat(start_time)
+        stmt = stmt.where(AuditTrail.created_at >= start_dt)
+        count_stmt = count_stmt.where(AuditTrail.created_at >= start_dt)
+    if end_time:
+        end_dt = datetime.fromisoformat(end_time)
+        stmt = stmt.where(AuditTrail.created_at <= end_dt)
+        count_stmt = count_stmt.where(AuditTrail.created_at <= end_dt)
+    if resource_type:
+        stmt = stmt.where(AuditTrail.resource_type.ilike(f"%{resource_type}%"))
+        count_stmt = count_stmt.where(AuditTrail.resource_type.ilike(f"%{resource_type}%"))
+    if detail:
+        stmt = stmt.where(func.cast(AuditTrail.details, String).ilike(f"%{detail}%"))
+        count_stmt = count_stmt.where(func.cast(AuditTrail.details, String).ilike(f"%{detail}%"))
 
     total_result = await db.execute(count_stmt)
     total = total_result.scalar_one()

@@ -141,12 +141,24 @@ export interface AuditTrailList {
 
 export function fetchAuditTrail(
   token: string,
-  params?: { page?: number; user_id?: string; action?: string }
+  params?: {
+    page?: number;
+    user_id?: string;
+    action?: string;
+    start_time?: string;
+    end_time?: string;
+    resource_type?: string;
+    detail?: string;
+  }
 ): Promise<AuditTrailList> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.user_id) query.set("user_id", params.user_id);
   if (params?.action) query.set("action", params.action);
+  if (params?.start_time) query.set("start_time", params.start_time);
+  if (params?.end_time) query.set("end_time", params.end_time);
+  if (params?.resource_type) query.set("resource_type", params.resource_type);
+  if (params?.detail) query.set("detail", params.detail);
   const qs = query.toString();
   return apiFetch(`/api/v1/audit${qs ? `?${qs}` : ""}`, { token });
 }
@@ -192,13 +204,24 @@ export interface HourlyTrend {
 }
 
 export interface DashboardStats {
-  total_today: number;
-  blocked_today: number;
+  total: number;
+  blocked: number;
+  block_rate: number;
   active_rules: number;
   service_breakdown: Record<string, number>;
   hourly_trend: HourlyTrend[];
+  period: string;
 }
 
-export function fetchDashboardStats(token: string): Promise<DashboardStats> {
-  return apiFetch("/api/v1/dashboard/stats", { token });
+export interface BlockedUser {
+  user_name: string;
+  blocked_count: number;
+}
+
+export function fetchDashboardStats(token: string, period: string = "today"): Promise<DashboardStats> {
+  return apiFetch(`/api/v1/dashboard/stats?period=${period}`, { token });
+}
+
+export function fetchTopBlockedUsers(token: string, period: string = "today"): Promise<BlockedUser[]> {
+  return apiFetch(`/api/v1/dashboard/top-blocked-users?period=${period}`, { token });
 }
