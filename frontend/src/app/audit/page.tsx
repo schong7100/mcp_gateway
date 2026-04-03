@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { fetchAuditTrail, AuditTrailEntry, AuditTrailList } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -56,6 +56,14 @@ function DetailCell({ details }: { details: Record<string, unknown> | null }) {
 }
 
 export default function AuditPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-8 text-gray-400">로딩 중...</div>}>
+      <AuditContent />
+    </Suspense>
+  );
+}
+
+function AuditContent() {
   const { token, isLoading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const [data, setData] = useState<AuditTrailList | null>(null);
