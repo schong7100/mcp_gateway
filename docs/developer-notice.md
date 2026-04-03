@@ -127,7 +127,16 @@ Oracle DB TNS Listener ORA-12541 에러 해결 방법
 ```
 
 > `{gateway-host}`와 `{발급받은-API-KEY}`는 IT 담당자로부터 발급받습니다.
-> 기존 Nexus MCP 등 다른 설정이 있다면 `"mcp"` 안에 항목만 추가하세요.
+> 기존 Nexus MCP 등 다른 설정이 있다면 `"mcp"` 안에 항목만 추가하세요. 기존 설정을 덮어쓰지 마세요.
+
+### 보안 페르소나 (AGENTS.md)
+
+프로젝트에 포함된 `AGENTS.md` 파일이 AI 모델의 보안 정책을 자동 적용합니다.
+- **Qwen 3.5 환경**: `AGENTS.md`만으로 동작 (별도 설정 불필요)
+- **Claude 환경**: `CLAUDE.md` + `.claude/skills/` 추가 배포 필요
+
+> 이미 프로젝트에 `AGENTS.md`가 있다면, 보안 정책 섹션(`## 보안 정책`)을 기존 파일에 병합하세요.
+> 상세 설정 방법: [개발자 PC 설정 가이드](developer-setup.md) 참조
 
 ---
 

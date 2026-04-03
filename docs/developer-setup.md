@@ -65,6 +65,8 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
 
 **설정 파일 위치**: `%APPDATA%\opencode\opencode.json`
 
+### 2-A. 신규 설정 (opencode.json이 없거나 MCP 설정이 없는 경우)
+
 ```json
 {
   "mcp": {
@@ -89,22 +91,93 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
 }
 ```
 
+### 2-B. 기존 MCP 설정이 있는 경우 (병합)
+
+이미 Nexus MCP 등 다른 MCP 서버가 설정되어 있다면, **기존 `"mcp"` 객체 안에 `"context7"`과 `"exa"` 항목만 추가**합니다.
+
+```json
+{
+  "mcp": {
+    "nexus": { ... },
+    "기존-mcp-서버": { ... },
+
+    "context7": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp"],
+      "environment": {
+        "CONTEXT7_API_URL": "http://<gateway-ip>:18000/proxy/c7",
+        "CONTEXT7_API_KEY": "727a17912b5c1b79564ba42e59b47ae17dc65c82df35717adb14e75d0bb27b0b",
+        "DEFAULT_MINIMUM_TOKENS": "5000"
+      }
+    },
+    "exa": {
+      "type": "local",
+      "command": ["exa-mcp-server"],
+      "environment": {
+        "EXA_BASE_URL": "http://<gateway-ip>:18000/proxy/exa",
+        "EXA_API_KEY": "727a17912b5c1b79564ba42e59b47ae17dc65c82df35717adb14e75d0bb27b0b"
+      }
+    }
+  }
+}
+```
+
+> ⚠️ **주의**: 기존 설정을 덮어쓰지 마세요. JSON 문법 오류(쉼표 누락 등)를 확인하세요.
+
 **필수 변경:**
 - `<gateway-ip>`: MCP Gateway 서버 IP (IT 담당자에게 확인)
 - Proxy API Key는 위 설정에 이미 포함되어 있습니다 (전 개발자 공통)
 
 > **참고**: `EXA_API_KEY`에도 Proxy API Key를 설정합니다. 실제 Exa API Key는 Gateway 서버에서 관리합니다.
 
-> **기존 Nexus MCP 등 다른 MCP 서버가 이미 설정되어 있다면**, `"mcp"` 객체 안에 `"context7"`과 `"exa"` 항목만 추가하세요. 기존 설정을 덮어쓰지 않도록 주의합니다.
-
 ---
 
-## 3. 보안 페르소나 배포 (CLAUDE.md)
+## 3. 보안 페르소나 배포
 
-보안 담당자가 관리하는 `CLAUDE.md` 파일을 프로젝트 루트에 배포합니다.
-이 파일은 opencode가 외부 검색 시 민감 정보를 자동으로 일반화하도록 지시합니다.
+보안 담당자가 관리하는 보안 정책 파일을 프로젝트에 배포합니다.
+이 파일은 AI 모델이 외부 검색 시 민감 정보를 자동으로 일반화하도록 지시합니다.
 
-### 자동 배포 (보안 담당자가 1회 실행)
+### 사용 모델에 따른 파일 구성
+
+| AI 모델 | 읽는 파일 | 설명 |
+|---------|----------|------|
+| **Qwen 3.5** (opencode 기본) | `AGENTS.md` | 보안 정책이 인라인으로 포함됨 (스킬 참조 없음) |
+| **Claude** (opencode + Claude 연동) | `CLAUDE.md` + `.claude/skills/` | 보안 스킬 on-demand 호출 방식 |
+
+> **Qwen 3.5 환경에서는 `AGENTS.md`만 있으면 됩니다.** Claude 전용 스킬(`.claude/skills/`)은 동작하지 않습니다.
+
+### 3-A. AGENTS.md 배포 (Qwen 3.5 — 권장)
+
+`AGENTS.md`는 프로젝트 저장소에 이미 포함되어 있으므로 `git clone`만 하면 자동 적용됩니다.
+
+```powershell
+# 프로젝트 클론 시 AGENTS.md가 자동 포함
+git clone https://github.com/schong7100/mcp_gateway.git
+cd mcp_gateway
+# → AGENTS.md에 보안 정책이 이미 포함되어 있음
+```
+
+**기존 프로젝트에 AGENTS.md가 있는 경우:**
+
+개발자가 자신의 프로젝트에 이미 `AGENTS.md`를 사용 중이라면, MCP Gateway 보안 정책 섹션을 기존 파일에 **병합**해야 합니다.
+
+```powershell
+# 방법 1: 보안 정책 섹션만 추출하여 기존 AGENTS.md에 추가
+# MCP Gateway의 AGENTS.md에서 "## 보안 정책" ~ 다음 "## " 이전까지 복사
+# 기존 AGENTS.md 최상단에 붙여넣기 (보안 정책이 가장 먼저 읽히도록)
+
+# 방법 2: 보안 정책 별도 파일로 분리
+# 일부 opencode 버전은 여러 .md 파일을 읽을 수 있음
+# 이 경우 SECURITY.md로 분리 가능 (IT 담당자에게 확인)
+```
+
+> ⚠️ **핵심**: 보안 정책 섹션(`## 보안 정책`)이 AGENTS.md 내에 반드시 존재해야 합니다. 삭제하거나 수정하지 마세요.
+
+### 3-B. CLAUDE.md + 스킬 배포 (Claude 모델 사용 시)
+
+Claude 모델을 사용하는 환경에서는 추가로 `CLAUDE.md`와 `.claude/skills/`를 배포합니다.
+
+#### 자동 배포 (보안 담당자가 1회 실행)
 
 ```powershell
 # 1. 보안 정책 저장소 클론
@@ -121,9 +194,7 @@ mkdir "C:\Users\%USERNAME%\projects\.claude" 2>NUL
 mklink /D "C:\Users\%USERNAME%\projects\.claude\skills" "C:\opencode\security\.claude\skills"
 ```
 
-### 수동 배포 (심볼릭 링크 불가 시)
-
-보안 담당자에게 `CLAUDE.md` 파일과 `.claude/skills/` 디렉토리를 전달받아 프로젝트에 복사합니다.
+#### 수동 배포 (심볼릭 링크 불가 시)
 
 ```powershell
 # 보안 담당자가 제공한 파일을 프로젝트에 복사
@@ -135,7 +206,7 @@ attrib +R "C:\Users\%USERNAME%\projects\CLAUDE.md"
 attrib +R "C:\Users\%USERNAME%\projects\.claude\skills\*" /S
 ```
 
-### CLAUDE.md의 역할
+### 보안 페르소나의 역할
 
 | 동작 | 설명 |
 |------|------|
