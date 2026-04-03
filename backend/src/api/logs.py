@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import CurrentUser, get_current_user
@@ -18,9 +18,14 @@ router = APIRouter(prefix="/api/v1/logs", tags=["logs"])
 async def list_search_logs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
-    service: str | None = Query(default=None, pattern=r"^(context7|exa)$"),
+    service: str | None = Query(default=None),
     user_id: str | None = None,
     filtered_only: bool = False,
+    start_time: str | None = Query(default=None, description="ISO format start time"),
+    end_time: str | None = Query(default=None, description="ISO format end time"),
+    query: str | None = Query(default=None, description="검색 내용 (request body 텍스트 검색)"),
+    status_code: int | None = Query(default=None, description="응답 상태 코드"),
+    filter_reason: str | None = Query(default=None, description="차단 사유 검색"),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SearchLogListResponse:
@@ -28,15 +33,32 @@ async def list_search_logs(
     count_stmt = select(func.count(SearchLog.id))
 
     if service:
-        service_key = "c7" if service == "context7" else service
+        service_key = "c7" if service.lower() in ("context7", "c7") else service.lower()
         stmt = stmt.where(SearchLog.service == service_key)
         count_stmt = count_stmt.where(SearchLog.service == service_key)
     if user_id:
-        stmt = stmt.where(SearchLog.user_id == user_id)
-        count_stmt = count_stmt.where(SearchLog.user_id == user_id)
+        stmt = stmt.where(SearchLog.user_name.ilike(f"%{user_id}%"))
+        count_stmt = count_stmt.where(SearchLog.user_name.ilike(f"%{user_id}%"))
     if filtered_only:
         stmt = stmt.where(SearchLog.filtered.is_(True))
         count_stmt = count_stmt.where(SearchLog.filtered.is_(True))
+    if start_time:
+        start_dt = datetime.fromisoformat(start_time)
+        stmt = stmt.where(SearchLog.created_at >= start_dt)
+        count_stmt = count_stmt.where(SearchLog.created_at >= start_dt)
+    if end_time:
+        end_dt = datetime.fromisoformat(end_time)
+        stmt = stmt.where(SearchLog.created_at <= end_dt)
+        count_stmt = count_stmt.where(SearchLog.created_at <= end_dt)
+    if query:
+        stmt = stmt.where(func.cast(SearchLog.request_body, String).ilike(f"%{query}%"))
+        count_stmt = count_stmt.where(func.cast(SearchLog.request_body, String).ilike(f"%{query}%"))
+    if status_code:
+        stmt = stmt.where(SearchLog.response_status == status_code)
+        count_stmt = count_stmt.where(SearchLog.response_status == status_code)
+    if filter_reason:
+        stmt = stmt.where(func.cast(SearchLog.filter_details, String).ilike(f"%{filter_reason}%"))
+        count_stmt = count_stmt.where(func.cast(SearchLog.filter_details, String).ilike(f"%{filter_reason}%"))
 
     total_result = await db.execute(count_stmt)
     total = total_result.scalar_one()

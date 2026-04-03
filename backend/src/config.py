@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     keycloak_client_id: str = "mcp-gateway-api"
     keycloak_admin_client_id: str = "mcp-gateway-admin"
     keycloak_admin_client_secret: str = ""
+    keycloak_admin_username: str = "admin"
+    keycloak_admin_password: str = "admin"
 
     # Proxy
     http_proxy: str = ""

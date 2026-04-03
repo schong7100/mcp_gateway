@@ -59,13 +59,29 @@ export interface SearchLogList {
 
 export function fetchLogs(
   token: string,
-  params?: { page?: number; service?: string; filtered_only?: boolean }
+  params?: {
+    page?: number;
+    service?: string;
+    filtered_only?: boolean;
+    start_time?: string;
+    end_time?: string;
+    query?: string;
+    status_code?: number;
+    filter_reason?: string;
+    user_id?: string;
+  }
 ): Promise<SearchLogList> {
-  const query = new URLSearchParams();
-  if (params?.page) query.set("page", String(params.page));
-  if (params?.service) query.set("service", params.service);
-  if (params?.filtered_only) query.set("filtered_only", "true");
-  const qs = query.toString();
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.service) q.set("service", params.service);
+  if (params?.filtered_only) q.set("filtered_only", "true");
+  if (params?.start_time) q.set("start_time", params.start_time);
+  if (params?.end_time) q.set("end_time", params.end_time);
+  if (params?.query) q.set("query", params.query);
+  if (params?.status_code) q.set("status_code", String(params.status_code));
+  if (params?.filter_reason) q.set("filter_reason", params.filter_reason);
+  if (params?.user_id) q.set("user_id", params.user_id);
+  const qs = q.toString();
   return apiFetch(`/api/v1/logs${qs ? `?${qs}` : ""}`, { token });
 }
 

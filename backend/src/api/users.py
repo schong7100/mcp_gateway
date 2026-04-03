@@ -11,21 +11,20 @@ _admin_token_cache: dict | None = None
 
 
 async def _get_admin_token() -> str:
-    """Keycloak Admin REST API용 서비스 계정 토큰을 획득합니다."""
+    """Keycloak Admin REST API용 관리자 토큰을 획득합니다."""
     global _admin_token_cache, _admin_client
     if _admin_client is None:
         _admin_client = httpx.AsyncClient()
 
-    token_url = (
-        f"{settings.keycloak_url}/realms/{settings.keycloak_realm}"
-        "/protocol/openid-connect/token"
-    )
+    # master realm의 admin 계정으로 Resource Owner Password Grant
+    token_url = f"{settings.keycloak_url}/realms/master/protocol/openid-connect/token"
     resp = await _admin_client.post(
         token_url,
         data={
-            "grant_type": "client_credentials",
-            "client_id": settings.keycloak_admin_client_id,
-            "client_secret": settings.keycloak_admin_client_secret,
+            "grant_type": "password",
+            "client_id": "admin-cli",
+            "username": settings.keycloak_admin_username,
+            "password": settings.keycloak_admin_password,
         },
     )
     if resp.status_code != 200:

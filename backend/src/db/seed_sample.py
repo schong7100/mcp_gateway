@@ -14,9 +14,11 @@ from src.db.models import AuditTrail, SearchLog
 from src.db.session import async_session_factory
 
 USERS = [
-    ("dev-001", "김철수"),
-    ("dev-002", "이영희"),
-    ("dev-003", "박민수"),
+    ("ip:10.1.10.101", "10.1.10.101"),
+    ("ip:10.1.10.102", "10.1.10.102"),
+    ("ip:10.1.10.103", "10.1.10.103"),
+    ("ip:10.1.10.104", "10.1.10.104"),
+    ("ip:10.1.10.105", "10.1.10.105"),
 ]
 
 C7_PATHS = [
@@ -173,8 +175,8 @@ async def seed_sample_data(db: AsyncSession) -> int:
         created = now - timedelta(minutes=minutes_ago)
 
         audit = AuditTrail(
-            user_id="dev-001",
-            user_name="김철수",
+            user_id="ip:10.1.10.101",
+            user_name="10.1.10.101",
             action=action,
             resource_type=resource_type,
             resource_id=f"rule-{random.randint(1, 12)}",

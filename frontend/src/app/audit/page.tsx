@@ -5,6 +5,13 @@ import { useSearchParams } from 'next/navigation';
 import { fetchAuditTrail, AuditTrailEntry, AuditTrailList } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
+const SEARCH_FIELDS = [
+  { value: 'user_id', label: '사용자 (IP)' },
+  { value: 'action', label: '액션' },
+  { value: 'resource_type', label: '리소스' },
+  { value: 'detail', label: '상세' },
+];
+
 function getActionLabel(entry: AuditTrailEntry): { label: string; color: string } {
   switch (entry.action) {
     case 'search':
@@ -69,28 +76,24 @@ function AuditContent() {
   const [data, setData] = useState<AuditTrailList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [action, setAction] = useState('');
-  const [userId, setUserId] = useState(searchParams.get('user_id') ?? '');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [resourceType, setResourceType] = useState('');
-  const [detail, setDetail] = useState('');
+  const [searchField, setSearchField] = useState('user_id');
+  const [searchValue, setSearchValue] = useState(searchParams.get('user_id') ?? '');
   const [page, setPage] = useState(1);
-  const filtersRef = useRef({ action, userId, startTime, endTime, resourceType, detail });
-  filtersRef.current = { action, userId, startTime, endTime, resourceType, detail };
+  const filtersRef = useRef({ startTime, endTime, searchField, searchValue });
+  filtersRef.current = { startTime, endTime, searchField, searchValue };
 
   const load = useCallback((filters: typeof filtersRef.current, pageVal: number) => {
     setLoading(true);
     setError(null);
-    fetchAuditTrail(token, {
-      page: pageVal,
-      action: filters.action || undefined,
-      user_id: filters.userId || undefined,
-      start_time: filters.startTime || undefined,
-      end_time: filters.endTime || undefined,
-      resource_type: filters.resourceType || undefined,
-      detail: filters.detail || undefined,
-    })
+    const params: Record<string, string | number | undefined> = { page: pageVal };
+    if (filters.startTime) params.start_time = filters.startTime;
+    if (filters.endTime) params.end_time = filters.endTime;
+    if (filters.searchValue) {
+      params[filters.searchField] = filters.searchValue;
+    }
+    fetchAuditTrail(token, params as Parameters<typeof fetchAuditTrail>[1])
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -104,10 +107,11 @@ function AuditContent() {
   // URL 파라미터로 user_id가 전달된 경우 자동 검색
   useEffect(() => {
     const urlUserId = searchParams.get('user_id');
-    if (urlUserId && urlUserId !== userId) {
-      setUserId(urlUserId);
+    if (urlUserId && urlUserId !== searchValue) {
+      setSearchField('user_id');
+      setSearchValue(urlUserId);
       setPage(1);
-      load({ ...filtersRef.current, userId: urlUserId }, 1);
+      load({ ...filtersRef.current, searchField: 'user_id', searchValue: urlUserId }, 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -119,14 +123,12 @@ function AuditContent() {
   }
 
   function handleReset() {
-    setAction('');
-    setUserId('');
     setStartTime('');
     setEndTime('');
-    setResourceType('');
-    setDetail('');
+    setSearchField('user_id');
+    setSearchValue('');
     setPage(1);
-    load({ action: '', userId: '', startTime: '', endTime: '', resourceType: '', detail: '' }, 1);
+    load({ startTime: '', endTime: '', searchField: 'user_id', searchValue: '' }, 1);
   }
 
   const totalPages = data ? Math.ceil(data.total / data.page_size) : 1;
@@ -143,12 +145,12 @@ function AuditContent() {
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
         <form onSubmit={handleSearch} className="px-6 py-4 border-b dark:border-gray-700">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
+          <div className="flex flex-wrap items-end gap-3 mb-3">
             <div>
               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">시작 시간</label>
               <input
                 type="datetime-local"
-                className="w-full border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+                className="border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
               />
@@ -157,54 +159,31 @@ function AuditContent() {
               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">종료 시간</label>
               <input
                 type="datetime-local"
-                className="w-full border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+                className="border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">사용자 (IP)</label>
-              <input
-                type="text"
-                placeholder="IP 검색"
-                className="w-full border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">액션</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">검색 기준</label>
               <select
-                className="w-full border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
-                value={action}
-                onChange={(e) => setAction(e.target.value)}
+                className="border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value)}
               >
-                <option value="">전체</option>
-                <option value="search">검색</option>
-                <option value="search_blocked">차단</option>
-                <option value="filter_create">규칙 생성</option>
-                <option value="filter_update">규칙 수정</option>
-                <option value="filter_delete">규칙 삭제</option>
+                {SEARCH_FIELDS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">리소스</label>
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">검색어</label>
               <input
                 type="text"
-                placeholder="리소스 타입"
+                placeholder={`${SEARCH_FIELDS.find(f => f.value === searchField)?.label ?? ''} 검색...`}
                 className="w-full border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
-                value={resourceType}
-                onChange={(e) => setResourceType(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">상세</label>
-              <input
-                type="text"
-                placeholder="상세 내용 검색"
-                className="w-full border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
-                value={detail}
-                onChange={(e) => setDetail(e.target.value)}
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
               />
             </div>
           </div>
@@ -234,9 +213,7 @@ function AuditContent() {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {loading ? (
               <tr>
-                <td className="px-6 py-8 text-center text-gray-400" colSpan={5}>
-                  로딩 중...
-                </td>
+                <td className="px-6 py-8 text-center text-gray-400" colSpan={5}>로딩 중...</td>
               </tr>
             ) : data && data.items.length > 0 ? (
               data.items.map((entry: AuditTrailEntry) => {
@@ -266,9 +243,7 @@ function AuditContent() {
               })
             ) : (
               <tr>
-                <td className="px-6 py-8 text-center text-gray-400" colSpan={5}>
-                  감사 로그가 없습니다.
-                </td>
+                <td className="px-6 py-8 text-center text-gray-400" colSpan={5}>감사 로그가 없습니다.</td>
               </tr>
             )}
           </tbody>
