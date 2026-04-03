@@ -16,7 +16,7 @@ interface ThemeContextType extends ThemeSettings {
 
 const defaultTheme: ThemeSettings = {
   darkMode: false,
-  primaryColor: '#1e3a5f',
+  primaryColor: '#1B3F7A',
   logoUrl: null,
 };
 

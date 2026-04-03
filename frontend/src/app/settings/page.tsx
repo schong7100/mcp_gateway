@@ -4,12 +4,12 @@ import { useState, useRef } from 'react';
 import { useTheme } from '@/lib/theme';
 
 const PRESET_COLORS = [
-  { name: 'Navy (기본)', value: '#1e3a5f' },
-  { name: 'Blue', value: '#2563eb' },
-  { name: 'Green', value: '#059669' },
+  { name: 'imbank Navy', value: '#1B3F7A' },
+  { name: 'Deep Navy', value: '#0F2A54' },
+  { name: 'Royal Blue', value: '#2563eb' },
+  { name: 'Teal', value: '#0D7377' },
   { name: 'Purple', value: '#7c3aed' },
-  { name: 'Red', value: '#dc2626' },
-  { name: 'Orange', value: '#ea580c' },
+  { name: 'Slate', value: '#475569' },
 ];
 
 export default function SettingsPage() {

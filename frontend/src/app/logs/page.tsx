@@ -90,40 +90,44 @@ export default function LogsPage() {
   const totalPages = data ? Math.ceil(data.total / data.page_size) : 1;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6 dark:text-white">검색 로그</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--color-text)]">검색 로그</h1>
+        <p className="text-sm text-[var(--color-muted)] mt-0.5">AI 프록시 검색 요청 기록</p>
+      </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-400 text-sm">
-          오류: {error}
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-400">
+          ⚠️ {error}
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <form onSubmit={handleSearch} className="px-6 py-4 border-b dark:border-gray-700">
+      <div className="card overflow-hidden">
+        {/* Search form */}
+        <form onSubmit={handleSearch} className="px-6 py-5 border-b border-[var(--color-border)]">
           <div className="flex flex-wrap items-end gap-3 mb-3">
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">시작 시간</label>
+              <label className="block text-xs font-medium text-[var(--color-muted)] mb-1.5">시작 시간</label>
               <input
                 type="datetime-local"
-                className="border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+                className="border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm bg-[var(--color-card)] text-[var(--color-text)]"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">종료 시간</label>
+              <label className="block text-xs font-medium text-[var(--color-muted)] mb-1.5">종료 시간</label>
               <input
                 type="datetime-local"
-                className="border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+                className="border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm bg-[var(--color-card)] text-[var(--color-text)]"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">검색 기준</label>
+              <label className="block text-xs font-medium text-[var(--color-muted)] mb-1.5">검색 기준</label>
               <select
-                className="border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+                className="border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm bg-[var(--color-card)] text-[var(--color-text)]"
                 value={searchField}
                 onChange={(e) => setSearchField(e.target.value)}
               >
@@ -133,44 +137,55 @@ export default function LogsPage() {
               </select>
             </div>
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">검색어</label>
+              <label className="block text-xs font-medium text-[var(--color-muted)] mb-1.5">검색어</label>
               <input
                 type="text"
                 placeholder={`${SEARCH_FIELDS.find(f => f.value === searchField)?.label ?? ''} 검색...`}
-                className="w-full border dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+                className="w-full border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm bg-[var(--color-card)] text-[var(--color-text)] placeholder:text-[var(--color-muted)]"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
               />
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button type="submit" className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-              검색
-            </button>
-            <button type="button" onClick={handleReset} className="px-4 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 dark:text-gray-200 border dark:border-gray-600 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+            <button type="submit" className="btn-primary">검색</button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:bg-[var(--color-surface)] transition-colors"
+            >
               초기화
             </button>
             {data && (
-              <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">전체 {data.total}건</span>
+              <span className="ml-auto text-sm text-[var(--color-muted)]">전체 {data.total}건</span>
             )}
           </div>
         </form>
 
+        {/* Table */}
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th className="px-6 py-3 text-left font-medium text-gray-500 dark:text-gray-300">시간</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500 dark:text-gray-300">사용자 (IP)</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500 dark:text-gray-300">서비스</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500 dark:text-gray-300">검색 내용</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500 dark:text-gray-300">상태</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-500 dark:text-gray-300">차단 사유</th>
+          <thead>
+            <tr className="bg-[var(--color-surface)] border-b border-[var(--color-border)]">
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">시간</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">사용자 (IP)</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">서비스</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">검색 내용</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">상태</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">차단 사유</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+          <tbody className="divide-y divide-[var(--color-border)]">
             {loading ? (
               <tr>
-                <td className="px-6 py-8 text-center text-gray-400" colSpan={6}>로딩 중...</td>
+                <td className="px-6 py-10 text-center text-[var(--color-muted)]" colSpan={6}>
+                  <span className="inline-flex items-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    로딩 중...
+                  </span>
+                </td>
               </tr>
             ) : data && data.items.length > 0 ? (
               data.items.map((log: SearchLog) => {
@@ -181,34 +196,48 @@ export default function LogsPage() {
                 return (
                   <tr
                     key={log.id}
-                    className={`${log.filtered ? 'bg-red-50 dark:bg-red-900/20' : ''} cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50`}
+                    className={`cursor-pointer transition-colors ${
+                      log.filtered
+                        ? 'bg-red-50 dark:bg-red-900/10 hover:bg-red-100/60 dark:hover:bg-red-900/20'
+                        : 'hover:bg-[var(--color-surface)]'
+                    }`}
                     onClick={() => setExpandedId(isExpanded ? null : log.id)}
                   >
-                    <td className="px-6 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap align-top">
+                    <td className="px-6 py-3 text-xs text-[var(--color-muted)] whitespace-nowrap align-top">
                       {new Date(log.created_at).toLocaleString('ko-KR')}
                     </td>
-                    <td className="px-6 py-3 dark:text-gray-300 align-top">{log.user_name}</td>
-                    <td className="px-6 py-3 capitalize dark:text-gray-300 align-top">{log.service}</td>
+                    <td className="px-6 py-3 font-medium text-[var(--color-text)] align-top">{log.user_name}</td>
+                    <td className="px-6 py-3 align-top">
+                      <span
+                        className="px-2 py-0.5 rounded text-xs font-semibold uppercase"
+                        style={{
+                          background: log.service === 'c7' ? '#EBF0FF' : '#FFF3E8',
+                          color: log.service === 'c7' ? '#1B3F7A' : '#E8821C',
+                        }}
+                      >
+                        {log.service}
+                      </span>
+                    </td>
                     <td className="px-6 py-3 align-top max-w-md">
                       {query ? (
                         <div>
-                          <p className={`text-sm ${log.filtered ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                          <p className={`text-sm ${log.filtered ? 'text-red-700 dark:text-red-400 font-medium' : 'text-[var(--color-text)]'}`}>
                             {query}
                           </p>
                           {isExpanded && (
-                            <p className="mt-1 font-mono text-xs text-gray-400">
+                            <p className="mt-1 font-mono text-xs text-[var(--color-muted)]">
                               {log.method} /{log.path}
                             </p>
                           )}
                         </div>
                       ) : (
-                        <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                        <span className="font-mono text-xs text-[var(--color-muted)]">
                           {log.method} /{log.path}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-3 align-top">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
                         log.response_status >= 400
                           ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400'
                           : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
@@ -233,11 +262,11 @@ export default function LogsPage() {
                           ))}
                         </div>
                       ) : log.filtered ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400">
                           필터 차단
                         </span>
                       ) : (
-                        <span className="text-gray-400 text-xs">—</span>
+                        <span className="text-[var(--color-muted)] text-xs">—</span>
                       )}
                     </td>
                   </tr>
@@ -245,28 +274,28 @@ export default function LogsPage() {
               })
             ) : (
               <tr>
-                <td className="px-6 py-8 text-center text-gray-400" colSpan={6}>로그가 없습니다.</td>
+                <td className="px-6 py-10 text-center text-[var(--color-muted)]" colSpan={6}>로그가 없습니다.</td>
               </tr>
             )}
           </tbody>
         </table>
 
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t dark:border-gray-700 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-[var(--color-border)] flex items-center justify-between">
             <button
-              className="text-sm px-3 py-1 border dark:border-gray-600 rounded disabled:opacity-40 dark:text-gray-300"
+              className="text-sm px-4 py-2 border border-[var(--color-border)] rounded-lg text-[var(--color-muted)] disabled:opacity-40 hover:bg-[var(--color-surface)] transition-colors"
               onClick={() => setPage((p) => p - 1)}
               disabled={page === 1}
             >
-              이전
+              ← 이전
             </button>
-            <span className="text-sm text-gray-500 dark:text-gray-400">{page} / {totalPages}</span>
+            <span className="text-sm text-[var(--color-muted)]">{page} / {totalPages}</span>
             <button
-              className="text-sm px-3 py-1 border dark:border-gray-600 rounded disabled:opacity-40 dark:text-gray-300"
+              className="text-sm px-4 py-2 border border-[var(--color-border)] rounded-lg text-[var(--color-muted)] disabled:opacity-40 hover:bg-[var(--color-surface)] transition-colors"
               onClick={() => setPage((p) => p + 1)}
               disabled={page === totalPages}
             >
-              다음
+              다음 →
             </button>
           </div>
         )}
