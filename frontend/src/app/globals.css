@@ -2,16 +2,39 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ── MCP Gateway Design System ───────────────────────────────────────── */
+/* ── MCP Gateway Design System (iM뱅크 Style) ───────────────────────── */
 :root {
-  --color-primary:   #1B3F7A;   /* imbank navy */
-  --color-accent:    #E8821C;   /* imbank orange */
-  --color-primary-dark: #0F2A54;
-  --color-surface:   #F4F6FA;
-  --color-card:      #FFFFFF;
-  --color-border:    #E2E8F0;
-  --color-text:      #1A2540;
-  --color-muted:     #6B7280;
+  /* Brand */
+  --color-primary:       #1B3F7A;
+  --color-primary-dark:  #0F2A54;
+  --color-primary-light: #2D5BA6;
+  --color-accent:        #E8821C;
+  --color-accent-light:  #F5A623;
+  --color-accent-dark:   #C96A10;
+
+  /* Semantic */
+  --color-success:  #16A34A;
+  --color-danger:   #DC2626;
+  --color-warning:  #D97706;
+  --color-info:     #2563EB;
+
+  /* Surface */
+  --color-surface:  #F4F6FA;
+  --color-card:     #FFFFFF;
+  --color-border:   #E2E8F0;
+  --color-text:     #1A2540;
+  --color-muted:    #6B7280;
+
+  /* Gradients */
+  --gradient-hero:    linear-gradient(135deg, #1B3F7A 0%, #0F2A54 60%, #162D5A 100%);
+  --gradient-accent:  linear-gradient(135deg, #E8821C 0%, #F5A623 100%);
+  --gradient-card:    linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(244,246,250,.5) 100%);
+
+  /* Shadows */
+  --shadow-sm:   0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:   0 2px 8px rgba(27,63,122,.08), 0 1px 3px rgba(0,0,0,.06);
+  --shadow-lg:   0 4px 24px rgba(27,63,122,.12), 0 2px 8px rgba(0,0,0,.06);
+  --shadow-glow: 0 0 20px rgba(232,130,28,.15);
 }
 
 .dark {
@@ -20,6 +43,13 @@
   --color-border:   #334155;
   --color-text:     #F1F5F9;
   --color-muted:    #94A3B8;
+
+  --gradient-hero:   linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #162032 100%);
+  --gradient-card:   linear-gradient(180deg, rgba(30,41,59,0) 0%, rgba(15,23,42,.5) 100%);
+  --shadow-sm:   0 1px 2px rgba(0,0,0,.2);
+  --shadow-md:   0 2px 8px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.15);
+  --shadow-lg:   0 4px 24px rgba(0,0,0,.3), 0 2px 8px rgba(0,0,0,.15);
+  --shadow-glow: 0 0 20px rgba(232,130,28,.1);
 }
 
 /* Smooth color transitions */
@@ -41,7 +71,11 @@ body {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-lg);
 }
 
 /* Accent card (left border highlight) */
@@ -57,10 +91,11 @@ body {
   padding: 0.5rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 600;
-  transition: background-color 150ms;
+  transition: background-color 150ms, box-shadow 150ms;
 }
 .btn-primary:hover {
   background-color: var(--color-primary-dark);
+  box-shadow: var(--shadow-md);
 }
 
 /* Stat card number */
@@ -69,4 +104,82 @@ body {
   font-weight: 700;
   line-height: 1.1;
   color: var(--color-text);
+}
+
+/* Dashboard hero banner */
+.dashboard-hero {
+  background: var(--gradient-hero);
+  border-radius: 1rem;
+  padding: 2rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.dashboard-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 60%;
+  height: 200%;
+  background: radial-gradient(ellipse, rgba(232,130,28,.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Stat card enhanced */
+.stat-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem 1.5rem;
+  transition: box-shadow 200ms ease, transform 200ms ease;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-accent);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.stat-card:hover::after {
+  opacity: 1;
+}
+
+/* Chart container */
+.chart-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+}
+
+/* Section divider */
+.section-divider {
+  height: 2px;
+  background: linear-gradient(to right, var(--color-accent), var(--color-primary), transparent);
+  border-radius: 1px;
+  opacity: 0.3;
+}
+
+/* Skeleton loading */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-border) 50%, var(--color-surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
 }
