@@ -219,7 +219,7 @@ export default function DashboardPage() {
                   <Bar
                     dataKey="blocked_count"
                     radius={[0, 3, 3, 0]}
-                    onClick={(data) => handleUserClick(data.user_name)}
+                    onClick={(_data, index) => { if (typeof index === 'number') handleUserClick(blockedUsers[index].user_name); }}
                     className="cursor-pointer"
                   >
                     {blockedUsers.map((_, index) => (
