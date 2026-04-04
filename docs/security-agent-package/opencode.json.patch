@@ -1,0 +1,37 @@
+{
+  "_설명": "이 파일은 opencode.json에 병합할 설정 조각입니다. 아래 3개 섹션을 기존 opencode.json에 추가하세요.",
+
+  "_1_instructions에_추가": {
+    "_위치": "opencode.json → instructions 배열",
+    "_설명": "기존 instructions 배열에 아래 항목을 추가합니다. 이미 있으면 스킵.",
+    "추가할_항목": ".opencode/rules/security-policy.md"
+  },
+
+  "_2_agent에_추가": {
+    "_위치": "opencode.json → agent 객체",
+    "_설명": "기존 agent 객체에 아래 항목을 추가합니다.",
+    "search-guard": {
+      "description": "외부 검색 보안 가드. 민감정보 유출 방지를 위해 검색 쿼리를 사전 검토하고 일반화합니다.",
+      "mode": "subagent",
+      "model": "cpf-llmd/RedHatAI/Qwen3.5-122B-A10B-NVFP4",
+      "prompt": "{file:.opencode/prompts/agents/search-guard.md}",
+      "tools": {
+        "read": true,
+        "bash": false,
+        "write": false,
+        "edit": false
+      }
+    }
+  },
+
+  "_3_command에_추가": {
+    "_위치": "opencode.json → command 객체",
+    "_설명": "기존 command 객체에 아래 항목을 추가합니다.",
+    "search-guard": {
+      "description": "보안 검토 후 외부 검색 실행 (민감정보 자동 일반화)",
+      "template": "{file:.opencode/commands/search-guard.md}\n\n$ARGUMENTS",
+      "agent": "search-guard",
+      "subtask": true
+    }
+  }
+}
