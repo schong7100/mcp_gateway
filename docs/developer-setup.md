@@ -190,7 +190,9 @@ copy C:\temp\security-agent\.opencode\commands\search-guard.md .opencode\command
 
 #### 훅 설정 활성화
 
-프로젝트 루트에 `.claude/settings.json`을 생성하고 훅을 등록합니다:
+프로젝트 루트에 `.claude/settings.json`을 생성하고 훅을 등록합니다.
+
+> ℹ️ `.claude/settings.json`은 oh-my-openagent 훅 설정 파일입니다. Claude 서비스/CLI와 무관하며, Claude 계정이 없어도 동작합니다.
 
 ```json
 {
