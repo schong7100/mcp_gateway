@@ -132,21 +132,11 @@ opencode 설정 파일에 MCP 서버를 등록합니다.
 
 ---
 
-## 3. 보안 페르소나 배포
+## 3. 보안 페르소나 및 보안 에이전트 배포
 
-보안 담당자가 관리하는 보안 정책 파일을 프로젝트에 배포합니다.
-이 파일은 AI 모델이 외부 검색 시 민감 정보를 자동으로 일반화하도록 지시합니다.
+보안 담당자가 관리하는 보안 정책 파일과 search-guard 에이전트를 프로젝트에 배포합니다.
 
-### 사용 모델에 따른 파일 구성
-
-| AI 모델 | 읽는 파일 | 설명 |
-|---------|----------|------|
-| **Qwen 3.5** (opencode 기본) | `AGENTS.md` | 보안 정책이 인라인으로 포함됨 (스킬 참조 없음) |
-| **Claude** (opencode + Claude 연동) | `CLAUDE.md` + `.claude/skills/` | 보안 스킬 on-demand 호출 방식 |
-
-> **Qwen 3.5 환경에서는 `AGENTS.md`만 있으면 됩니다.** Claude 전용 스킬(`.claude/skills/`)은 동작하지 않습니다.
-
-### 3-A. AGENTS.md 배포 (Qwen 3.5 — 권장)
+### 3-A. AGENTS.md 보안 정책
 
 `AGENTS.md`는 프로젝트 저장소에 이미 포함되어 있으므로 `git clone`만 하면 자동 적용됩니다.
 
@@ -162,60 +152,123 @@ cd mcp_gateway
 개발자가 자신의 프로젝트에 이미 `AGENTS.md`를 사용 중이라면, MCP Gateway 보안 정책 섹션을 기존 파일에 **병합**해야 합니다.
 
 ```powershell
-# 방법 1: 보안 정책 섹션만 추출하여 기존 AGENTS.md에 추가
 # MCP Gateway의 AGENTS.md에서 "## 보안 정책" ~ 다음 "## " 이전까지 복사
 # 기존 AGENTS.md 최상단에 붙여넣기 (보안 정책이 가장 먼저 읽히도록)
-
-# 방법 2: 보안 정책 별도 파일로 분리
-# 일부 opencode 버전은 여러 .md 파일을 읽을 수 있음
-# 이 경우 SECURITY.md로 분리 가능 (IT 담당자에게 확인)
 ```
 
 > ⚠️ **핵심**: 보안 정책 섹션(`## 보안 정책`)이 AGENTS.md 내에 반드시 존재해야 합니다. 삭제하거나 수정하지 마세요.
 
-### 3-B. CLAUDE.md + 스킬 배포 (Claude 모델 사용 시)
+### 3-B. search-guard 보안 에이전트 설치
 
-Claude 모델을 사용하는 환경에서는 추가로 `CLAUDE.md`와 `.claude/skills/`를 배포합니다.
+search-guard는 외부 검색 시 민감정보를 사전 검토하고 일반화하는 **0차 소프트 방어 에이전트**입니다.
 
-#### 자동 배포 (보안 담당자가 1회 실행)
+배포 패키지는 `docs/security-agent-package/`에 있습니다.
 
-```powershell
-# 1. 보안 정책 저장소 클론
-git clone https://internal-git/security/opencode-policy.git C:\opencode\security
-
-# 2. 읽기 전용 설정 (개발자가 수정 불가)
-icacls "C:\opencode\security\*" /deny "%USERNAME%:(W,D,DC)" /T
-
-# 3. CLAUDE.md 심볼릭 링크 (프로젝트 루트에 연결)
-mklink "C:\Users\%USERNAME%\projects\CLAUDE.md" "C:\opencode\security\CLAUDE.md"
-
-# 4. .claude/skills/ 심볼릭 링크 (on-demand 보안 스킬)
-mkdir "C:\Users\%USERNAME%\projects\.claude" 2>NUL
-mklink /D "C:\Users\%USERNAME%\projects\.claude\skills" "C:\opencode\security\.claude\skills"
-```
-
-#### 수동 배포 (심볼릭 링크 불가 시)
+#### Drop-in 파일 복사 (3개)
 
 ```powershell
-# 보안 담당자가 제공한 파일을 프로젝트에 복사
-copy \\fileserver\security\CLAUDE.md C:\Users\%USERNAME%\projects\CLAUDE.md
-xcopy /E /I \\fileserver\security\.claude\skills C:\Users\%USERNAME%\projects\.claude\skills
+# 내부 Git에서 보안 패키지 가져오기
+git clone http://<internal-git>/security/opencode-security-agent.git C:\temp\security-agent
 
-# 읽기 전용 설정
-attrib +R "C:\Users\%USERNAME%\projects\CLAUDE.md"
-attrib +R "C:\Users\%USERNAME%\projects\.claude\skills\*" /S
+# .opencode 디렉토리 생성 (없으면)
+mkdir .opencode\prompts\agents -Force
+mkdir .opencode\rules -Force
+mkdir .opencode\commands -Force
+
+# 파일 복사
+copy C:\temp\security-agent\.opencode\prompts\agents\search-guard.md .opencode\prompts\agents\
+copy C:\temp\security-agent\.opencode\rules\security-policy.md .opencode\rules\
+copy C:\temp\security-agent\.opencode\commands\search-guard.md .opencode\commands\
 ```
 
-### 보안 페르소나의 역할
+#### opencode.json 병합 (3곳)
 
-| 동작 | 설명 |
-|------|------|
-| 서버 IP → "Linux 서버" | `10.20.30.40에서 에러` → `Linux 서버에서 에러` |
-| 호스트명 → "데이터베이스 서버" | `db-master 연결 실패` → `데이터베이스 서버 연결 실패` |
-| 프로젝트명 → 일반화 | `프로젝트 알파` → `결제 시스템` |
-| 소프트웨어명 → 유지 | `FastAPI`, `PostgreSQL` → 그대로 검색 |
+`%APPDATA%\opencode\opencode.json`을 열어 아래 3곳을 추가합니다.
 
-> 이 파일은 **0차 방어** (소프트 레이어)입니다. 설령 우회되더라도 Gateway의 정규식 필터(1차 방어)가 IP/PII를 차단합니다.
+**① instructions 배열에 추가:**
+
+```diff
+  "instructions": [
+    "AGENTS.md",
+    ".opencode/rules/common-rules.md",
+    ...
++   ".opencode/rules/security-policy.md"
+  ],
+```
+
+**② agent 객체에 추가:**
+
+```diff
+  "agent": {
+    "build": { ... },
+    ...
++   "search-guard": {
++     "description": "외부 검색 보안 가드. 민감정보 유출 방지를 위해 검색 쿼리를 사전 검토하고 일반화합니다.",
++     "mode": "subagent",
++     "model": "cpf-llmd/RedHatAI/Qwen3.5-122B-A10B-NVFP4",
++     "prompt": "{file:.opencode/prompts/agents/search-guard.md}",
++     "tools": {
++       "read": true,
++       "bash": false,
++       "write": false,
++       "edit": false
++     }
++   }
+  },
+```
+
+**③ command 객체에 추가:**
+
+```diff
+  "command": {
+    "init": { ... },
+    ...
++   "search-guard": {
++     "description": "보안 검토 후 외부 검색 실행 (민감정보 자동 일반화)",
++     "template": "{file:.opencode/commands/search-guard.md}\n\n$ARGUMENTS",
++     "agent": "search-guard",
++     "subtask": true
++   }
+  },
+```
+
+> ⚠️ JSON 쉼표에 주의하세요. 마지막 항목 뒤에 쉼표가 없어야 합니다.
+
+#### opencode 재시작
+
+설정 변경 후 opencode를 완전히 종료하고 재시작합니다.
+
+#### 사용 방법
+
+```
+> /search-guard Oracle DB TNS Listener ORA-12541 에러 해결 방법
+```
+
+search-guard 에이전트가 쿼리를 검토 후 Context7/Exa를 통해 검색합니다.
+`security-policy.md`가 instructions에 포함되어 있으므로, **모든 에이전트**가 보안 정책을 인지합니다.
+
+### 보안 아키텍처 (2계층 방어)
+
+```
+개발자 PC                          MCP Gateway (서버)
+┌─────────────────────┐           ┌────────────────────┐
+│ search-guard 에이전트│           │ 정규식 필터 엔진   │
+│ (0차 소프트 방어)    │──HTTP──►│ (1차 하드 방어)     │──►  외부 API
+│                     │           │                    │
+│ • 쿼리 사전 검토    │           │ • IP/PII 패턴 매칭 │
+│ • 민감정보 일반화   │           │ • 403 차단 + 로깅  │
+│ • 공격 의도 차단    │           │ • 응답 마스킹      │
+└─────────────────────┘           └────────────────────┘
+```
+
+### 민감정보 일반화 예시
+
+| 개발자 입력 | search-guard 변환 | 결과 |
+|------------|-------------------|------|
+| `10.10.20.30에서 ORA-12541 에러` | `Oracle DB 서버에서 ORA-12541 에러` | ✅ 검색 |
+| `db-master 연결 실패 PostgreSQL` | `데이터베이스 서버 연결 실패 PostgreSQL` | ✅ 검색 |
+| `900101-1234567 조회 API` | ⚠️ 검색 거부 (PII 포함) | ❌ 차단 |
+| `FastAPI CORS 설정 방법` | 변환 없음 (안전) | ✅ 검색 |
 
 ---
 
