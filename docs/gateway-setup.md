@@ -263,4 +263,4 @@ podman exec deploy_postgres_1 pg_dump -U mcp mcp_gateway > backup_$(date +%Y%m%d
 | [개발자 PC 설정 가이드](developer-setup.md) | 개발자 PC에 opencode + MCP 서버 설정 |
 | [보안 담당자 매뉴얼](security-officer-manual.md) | 포털 사용법 및 운영 가이드 |
 | [개발자 공지](developer-notice.md) | 개발자 대상 MCP Gateway 안내문 |
-| [보안 아키텍처](../architecture/04-security-agent.md) | 3계층 보안 설계 (페르소나 + Gateway + 감사) |
+| [보안 아키텍처](../architecture/04-security-agent.md) | 3계층 보안 설계 (PreToolUse 훅 + search-guard + Gateway) |

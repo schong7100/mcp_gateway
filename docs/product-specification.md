@@ -14,7 +14,7 @@
 
 ### 1.2 목적
 
-폐쇄망 개발 환경에서 개발자 PC의 AI 코딩 도구(opencode)가 외부 기술 문서 검색 서비스(Context7, Exa)를 안전하게 활용할 수 있도록 중계하는 HTTP 리버스 프록시 시스템.
+폐쇄망 개발 환경에서 개발자 PC의 AI 코딩 도구(opencode + Qwen 3.5)가 외부 기술 문서 검색 서비스(Context7, Exa)를 안전하게 활용할 수 있도록 중계하는 HTTP 리버스 프록시 시스템.
 
 ### 1.3 핵심 가치
 
@@ -44,11 +44,12 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │  개발자 PC (Windows 11, 폐쇄망)                                  │
 │                                                                  │
-│  opencode ──► context7-mcp (stdio)                              │
-│               CONTEXT7_API_URL=http://gateway:18000/proxy/c7     │
-│                                                                  │
-│  opencode ──► exa-mcp-server (stdio)                            │
-│               EXA_BASE_URL=http://gateway:18000/proxy/exa        │
+│  opencode (+ oh-my-openagent, Qwen 3.5)                         │
+│  ├── PreToolUse 훅 — 민감정보 자동 차단/치환                    │
+│  ├── context7-mcp (stdio)                                       │
+│  │   CONTEXT7_API_URL=http://gateway:18000/proxy/c7              │
+│  └── exa-mcp-server (stdio)                                     │
+│      EXA_BASE_URL=http://gateway:18000/proxy/exa                 │
 └──────────────────────────┬───────────────────────────────────────┘
                            │ HTTP (아웃바운드 전용)
                            ▼
@@ -249,7 +250,18 @@ GET /health
 
 ---
 
-## 8. 보안 경계
+## 8. 보안 경계 (3계층 방어)
+
+### 보안 아키텍처
+
+| 계층 | 위치 | 방식 | 우회 |
+|------|------|------|------|
+| **-1차** | 개발자 PC | PreToolUse 훅 (JS 정규식, 자동) | ✕ 불가 |
+| **0차** | 개발자 PC | AGENTS.md 보안 정책 (LLM 판단) | △ 가능 |
+| **1차** | Gateway 서버 | 정규식 필터 차단 (403) | ✕ 불가 |
+| **2차** | Gateway + PC | 감사 로그 전수 기록 | ✕ 불가 |
+
+### 접근 제어
 
 | 경계 | 정책 |
 |------|------|
@@ -257,4 +269,18 @@ GET /health
 | 프록시 접근 | API Key 필수 (`MCP_GATEWAY_PROXY_API_KEY`) |
 | 외부 네트워크 | 방화벽 — context7.com, api.exa.ai 아웃바운드만 허용 |
 | DB 접근 | 컨테이너 내부 네트워크 전용 |
-| 민감 정보 | 차단 규칙에 의해 외부 전달 전 `[차단]` 치환 |
+| 민감 정보 | PreToolUse 훅 차단/치환 → Gateway 서버 차단 (403) |
+
+### 개발자 PC 보안 파일
+
+```
+프로젝트 루트
+├── AGENTS.md                         ← 보안 정책 (AI 모델 instructions)
+├── .claude/settings.json             ← PreToolUse 훅 설정 (oh-my-openagent)
+└── .opencode/
+    ├── hooks/
+    │   ├── search-guard-hook.js      ← 민감정보 차단/치환 (자동)
+    │   └── search-log-hook.js        ← 검색 감사 로깅 (자동)
+    ├── rules/security-policy.md      ← 보안 정책 룰
+    └── prompts/agents/search-guard.md ← 수동 보안 검색 에이전트
+```
