@@ -228,49 +228,53 @@ Keycloak에 등록된 포털 관리자 계정을 조회합니다.
 
 ---
 
-## 10. 보안 스킬 파일 관리
+## 10. 개발자 PC 보안 파일 관리
 
-### 개요
+### 개요 (3계층 방어)
 
-개발자 PC의 보안 페르소나는 두 가지 파일 유형으로 구성됩니다:
+개발자 PC의 보안 시스템은 3계층으로 구성됩니다:
 
-| 파일 | 위치 | 역할 | 로딩 |
-|------|------|------|------|
-| `CLAUDE.md` | 프로젝트 루트 | 핵심 원칙 (항상 적용) | 자동 |
-| skill 파일들 | `.claude/skills/` | 작업별 상세 절차 | on-demand |
+| 계층 | 파일 | 위치 | 역할 | 트리거 |
+|------|------|------|------|--------|
+| **-1차 훅** | `search-guard-hook.js` | `.opencode/hooks/` | 정규식 민감정보 차단/치환 | 자동 (MCP 호출 시) |
+| **-1차 훅** | `search-log-hook.js` | `.opencode/hooks/` | 검색 로컬 감사 로깅 | 자동 (MCP 호출 후) |
+| **-1차 설정** | `hooks.json` | `.opencode/hooks/` | 훅 바인딩 (context7/exa) | 자동 |
+| **-1차 설정** | `settings.json` | `.claude/` | oh-my-openagent 훅 설정 | 자동 |
+| **0차 정책** | `AGENTS.md` | 프로젝트 루트 | 보안 정책 (instructions) | 자동 (항상 로딩) |
+| **0차 정책** | `security-policy.md` | `.opencode/rules/` | 보안 정책 룰 | 자동 (instructions) |
+| **0차 에이전트** | `search-guard.md` | `.opencode/prompts/agents/` | LLM 의미 기반 검토 | 수동 (/search-guard) |
 
-### 스킬 파일 종류
+> ℹ️ `.claude/settings.json`은 oh-my-openagent 훅 설정 파일입니다. Claude 서비스와 무관합니다.
 
-| 파일명 | 적용 시점 | 내용 |
-|--------|----------|------|
-| `security-search-review.md` | 외부 검색(context7, exa) 전 | 쿼리 일반화 절차, 변환 기준 |
-| `security-code-review.md` | 코드 리뷰/PR 리뷰 | 민감정보 탐지, OWASP 체크리스트 |
-| `security-incident.md` | Gateway 403 차단 발생 시 | 대체 쿼리 생성, 반복 차단 대응 |
+### 보안 파일 수정 방법
 
-### 스킬 파일 수정 방법
-
-1. 보안 정책 git 저장소 클론
+1. 보안 패키지 git 저장소 수정
    ```
-   git clone https://internal-git/security/opencode-policy.git
+   git clone https://internal-git/security/opencode-security-agent.git
    ```
-2. 해당 skill 파일 수정 (`.claude/skills/*.md`)
-3. 검토 후 push → 개발자 PC에 자동 배포 (git pull 스케줄러)
+2. 해당 파일 수정
+3. 검토 후 push → 개발자 PC에서 git pull 시 자동 반영
 
-### 새 스킬 추가 시
+### 훅 패턴 추가 시
 
-1. `.claude/skills/` 아래 새 `.md` 파일 생성
-2. 파일 상단 frontmatter 작성:
-   ```yaml
-   ---
-   name: security-{new-skill}
-   description: {스킬 설명}
-   triggers:
-     - {적용 시점1}
-     - {적용 시점2}
-   ---
+`search-guard-hook.js`의 `DENY_PATTERNS` 또는 `REPLACE_PATTERNS` 배열에 추가:
+
+```javascript
+// 차단 패턴 추가 (검색 거부)
+{ name: '새로운PII', pattern: /새로운패턴/g },
+
+// 치환 패턴 추가 (일반화 후 검색)
+{ name: '새패턴', pattern: /새로운패턴/g, replacement: '[일반화]' },
+```
+
+### 새 MCP 서비스 추가 시
+
+1. `hooks.json`과 `.claude/settings.json`에 새 matcher 추가:
+   ```json
+   { "matcher": "mcp__{new-service}__*", "hooks": [...] }
    ```
-3. `CLAUDE.md`의 "스킬 참조" 섹션에 추가
-4. 이 매뉴얼 스킬 파일 종류 표에 추가
+2. Gateway backend에 `/proxy/{service}/*` 라우트 추가
+3. 배포 패키지 업데이트 → 개발자 PC 재배포
 
 ---
 

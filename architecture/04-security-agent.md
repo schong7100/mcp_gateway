@@ -220,8 +220,8 @@ search-guard-hook.js 실행 (stdin으로 JSON 수신)
 | 프롬프트 인젝션 | 0차 우회 시 1차 의존 | **-1차 훅이 모델 무관하게 차단** |
 | 클라이언트 로깅 | 없음 | **로컬 감사 로그** (search-audit.jsonl) |
 | 자동 치환 | LLM 판단에 의존 | **정규식 강제 치환** (updatedInput) |
-| Claude 의존성 | CLAUDE.md + .claude/skills/ | **모델 무관** (Qwen/Claude 모두 동작) |
-| 배포 복잡도 | CLAUDE.md 1개 | 훅 JS 2개 + 설정 2개 + 에이전트 3개 |
+| 모델 의존성 | Claude 전용 (CLAUDE.md + skills) | **모델 무관** (Qwen 3.5 기준, AGENTS.md 사용) |
+| 배포 복잡도 | CLAUDE.md 1개 | 훅 JS 2개 + 설정 2개 + 에이전트 3개 + AGENTS.md |
 
 ---
 
