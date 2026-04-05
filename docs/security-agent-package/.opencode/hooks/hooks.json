@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__context7__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .opencode/hooks/search-guard-hook.js"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__exa__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .opencode/hooks/search-guard-hook.js"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__context7__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .opencode/hooks/search-log-hook.js"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__exa__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .opencode/hooks/search-log-hook.js"
+          }
+        ]
+      }
+    ]
+  }
+}

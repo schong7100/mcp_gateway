@@ -158,39 +158,77 @@ cd mcp_gateway
 
 > ⚠️ **핵심**: 보안 정책 섹션(`## 보안 정책`)이 AGENTS.md 내에 반드시 존재해야 합니다. 삭제하거나 수정하지 마세요.
 
-### 3-B. search-guard 보안 에이전트 설치
+### 3-B. search-guard 보안 훅 + 에이전트 설치
 
-search-guard는 외부 검색 시 민감정보를 사전 검토하고 일반화하는 **0차 소프트 방어 에이전트**입니다.
+search-guard는 외부 검색 시 민감정보를 **자동으로 탐지/차단/치환**하는 보안 시스템입니다.
+oh-my-openagent의 `PreToolUse` 훅으로 **코드 레벨에서 강제**됩니다.
 
 배포 패키지는 `docs/security-agent-package/`에 있습니다.
 
-#### Drop-in 파일 복사 (3개)
+#### Drop-in 파일 복사 (6개)
 
 ```powershell
 # 내부 Git에서 보안 패키지 가져오기
 git clone http://<internal-git>/security/opencode-security-agent.git C:\temp\security-agent
 
-# .opencode 디렉토리 생성 (없으면)
+# .opencode 디렉토리 생성
+mkdir .opencode\hooks -Force
 mkdir .opencode\prompts\agents -Force
 mkdir .opencode\rules -Force
 mkdir .opencode\commands -Force
 
-# 파일 복사
+# 훅 파일 (자동 방어 — 핵심)
+copy C:\temp\security-agent\.opencode\hooks\search-guard-hook.js .opencode\hooks\
+copy C:\temp\security-agent\.opencode\hooks\search-log-hook.js .opencode\hooks\
+copy C:\temp\security-agent\.opencode\hooks\hooks.json .opencode\hooks\
+
+# 에이전트 파일 (수동 방어 + 정책)
 copy C:\temp\security-agent\.opencode\prompts\agents\search-guard.md .opencode\prompts\agents\
 copy C:\temp\security-agent\.opencode\rules\security-policy.md .opencode\rules\
 copy C:\temp\security-agent\.opencode\commands\search-guard.md .opencode\commands\
 ```
 
+#### 훅 설정 활성화
+
+프로젝트 루트에 `.claude/settings.json`을 생성하고 훅을 등록합니다:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__context7__*",
+        "hooks": [{ "type": "command", "command": "node .opencode/hooks/search-guard-hook.js" }]
+      },
+      {
+        "matcher": "mcp__exa__*",
+        "hooks": [{ "type": "command", "command": "node .opencode/hooks/search-guard-hook.js" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__context7__*",
+        "hooks": [{ "type": "command", "command": "node .opencode/hooks/search-log-hook.js" }]
+      },
+      {
+        "matcher": "mcp__exa__*",
+        "hooks": [{ "type": "command", "command": "node .opencode/hooks/search-log-hook.js" }]
+      }
+    ]
+  }
+}
+```
+
+> 기존 `.claude/settings.json`이 있으면 `hooks` 객체만 병합하세요.
+
 #### opencode.json 병합 (3곳)
 
-`%APPDATA%\opencode\opencode.json`을 열어 아래 3곳을 추가합니다.
+`%APPDATA%\opencode\opencode.json`에 아래 3곳을 추가합니다.
 
 **① instructions 배열에 추가:**
 
 ```diff
   "instructions": [
-    "AGENTS.md",
-    ".opencode/rules/common-rules.md",
     ...
 +   ".opencode/rules/security-policy.md"
   ],
@@ -200,19 +238,13 @@ copy C:\temp\security-agent\.opencode\commands\search-guard.md .opencode\command
 
 ```diff
   "agent": {
-    "build": { ... },
     ...
 +   "search-guard": {
 +     "description": "외부 검색 보안 가드. 민감정보 유출 방지를 위해 검색 쿼리를 사전 검토하고 일반화합니다.",
 +     "mode": "subagent",
 +     "model": "cpf-llmd/RedHatAI/Qwen3.5-122B-A10B-NVFP4",
 +     "prompt": "{file:.opencode/prompts/agents/search-guard.md}",
-+     "tools": {
-+       "read": true,
-+       "bash": false,
-+       "write": false,
-+       "edit": false
-+     }
++     "tools": { "read": true, "bash": false, "write": false, "edit": false }
 +   }
   },
 ```
@@ -221,7 +253,6 @@ copy C:\temp\security-agent\.opencode\commands\search-guard.md .opencode\command
 
 ```diff
   "command": {
-    "init": { ... },
     ...
 +   "search-guard": {
 +     "description": "보안 검토 후 외부 검색 실행 (민감정보 자동 일반화)",
@@ -238,27 +269,29 @@ copy C:\temp\security-agent\.opencode\commands\search-guard.md .opencode\command
 
 설정 변경 후 opencode를 완전히 종료하고 재시작합니다.
 
-#### 사용 방법
+#### 동작 확인
+
+일반 검색 시 훅이 **자동으로** 민감정보를 탐지합니다:
+- `10.10.20.30 에러` → 자동 치환: `[내부서버] 에러`로 검색
+- `900101-1234567 조회` → 자동 차단: 검색 실행 안 됨
+
+로그 확인: `.opencode/logs/search-guard.log`, `.opencode/logs/search-audit.jsonl`
+
+수동 보안 검색: `/search-guard <검색어>` (LLM 기반 의미 분석)
+
+### 보안 아키텍처 (3계층 방어)
 
 ```
-> /search-guard Oracle DB TNS Listener ORA-12541 에러 해결 방법
-```
-
-search-guard 에이전트가 쿼리를 검토 후 Context7/Exa를 통해 검색합니다.
-`security-policy.md`가 instructions에 포함되어 있으므로, **모든 에이전트**가 보안 정책을 인지합니다.
-
-### 보안 아키텍처 (2계층 방어)
-
-```
-개발자 PC                          MCP Gateway (서버)
-┌─────────────────────┐           ┌────────────────────┐
-│ search-guard 에이전트│           │ 정규식 필터 엔진   │
-│ (0차 소프트 방어)    │──HTTP──►│ (1차 하드 방어)     │──►  외부 API
-│                     │           │                    │
-│ • 쿼리 사전 검토    │           │ • IP/PII 패턴 매칭 │
-│ • 민감정보 일반화   │           │ • 403 차단 + 로깅  │
-│ • 공격 의도 차단    │           │ • 응답 마스킹      │
-└─────────────────────┘           └────────────────────┘
+개발자 PC                                    MCP Gateway (서버)
+┌───────────────────────────────────┐       ┌────────────────────┐
+│ PreToolUse 훅 (자동, 코드 강제)   │       │ 정규식 필터 엔진   │
+│ (-1차: 모델 우회 불가)            │       │ (1차 하드 방어)    │
+│ • 정규식 IP/PII 탐지 → 차단/치환 │──►│ • 서버 사이드 차단 │──►  외부 API
+│                                   │       │ • 403 + 감사 로깅  │
+│ search-guard 에이전트 (수동)      │       └────────────────────┘
+│ (0차: /search-guard 커맨드)       │
+│ • LLM 의미 분석 + 공격 의도 탐지 │
+└───────────────────────────────────┘
 ```
 
 ### 민감정보 일반화 예시
