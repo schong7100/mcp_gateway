@@ -1,20 +1,22 @@
 # 시스템 전체 구성도
 
-## 변경사항 (2026-03-31)
-1. **양방향 콘텐츠 필터링** — 요청(request)에도 필터 적용, 민감 정보 포함 시 403 차단
-2. **단독 Keycloak IDP** — OCP 연계 제거, Keycloak 자체 사용자 관리
-3. **Frontend 기능 확장** — 감사 로그, 사용자 관리 페이지 추가
+## 변경사항
+- (2026-03-31) 양방향 콘텐츠 필터링, 단독 Keycloak IDP, Frontend 기능 확장
+- (2026-04-05) 개발자 PC에 PreToolUse 훅 추가 — 3계층 보안 방어
 
 ## 아키텍처 다이어그램
 
 ```mermaid
 graph TB
     subgraph DEV["개발자 PC (Windows 11, 폐쇄망)"]
-        OC[opencode CLI]
+        OC[opencode CLI<br/>+ oh-my-openagent]
+        HOOK[PreToolUse 훅<br/>search-guard-hook.js]
         C7M[context7-mcp<br/>stdio]
         EXAM[exa-mcp-server<br/>stdio]
         OC -->|MCP stdio| C7M
         OC -->|MCP stdio| EXAM
+        OC -->|"MCP 호출 전 인터셉트"| HOOK
+        HOOK -->|"allow/deny/치환"| OC
     end
 
     subgraph GW["MCP Gateway (RHEL VM, Podman)"]
