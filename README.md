@@ -53,7 +53,7 @@ podman-compose up -d
 | 유형 | 설명 | 예시 |
 |------|------|------|
 | `regex` | 정규식 패턴 | 주민등록번호, IP 주소, 서버 정보 |
-| `keyword` | 키워드 블랙리스트 | password, secret, 내부 도메인 |
+| `keyword` | 키워드 블랙리스트 | credential, private_key, 비밀번호 등 |
 | `quality` | 품질 임계값 | 낮은 품질 결과 필터링 |
 
 필터링된 콘텐츠는 `[REDACTED]`로 마스킹 처리되어 개발자에게 전달됩니다.

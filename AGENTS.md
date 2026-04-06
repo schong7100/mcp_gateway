@@ -327,7 +327,7 @@ Developer PC ◄── filtered response
                   │   └── server info    │   │   └── server info   │
                   │                      │   │                     │
                   │ keyword rules ─► match│  │ keyword rules ─► match│──► [REDACTED]
-                  │   ├── password       │   │   ├── password      │
+                  │   ├── credential     │   │   ├── credential     │
                   │   └── credential     │   │   └── credential    │
                   │                      │   │                     │
                   │ ANY match ──► 403    │   │ ANY match ──► mask  │

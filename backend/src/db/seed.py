@@ -21,12 +21,17 @@ SEED_RULES: list[dict] = [
     },
     {
         "name": "민감 키워드",
-        "description": "범용 민감 키워드",
+        "description": "범용 민감 키워드 (오탐 빈도 높은 기술 용어 제외)",
         "rule_type": "keyword",
-        "pattern": (
-            "password,secret,credential,private_key,"
-            "비밀번호,passwd,token,api_key,access_key"
-        ),
+        "pattern": "credential,private_key,비밀번호,passwd",
+        "service": "all",
+        "direction": "both",
+    },
+    {
+        "name": "자격증명 할당문",
+        "description": "password/token/secret 등 값이 할당된 패턴만 탐지",
+        "rule_type": "regex",
+        "pattern": r"(?i)(?:password|passwd|token|secret|api_key|access_key)\s*[=:]\s*\S+",
         "service": "all",
         "direction": "both",
     },
@@ -48,9 +53,9 @@ SEED_RULES: list[dict] = [
     },
     {
         "name": "인증 토큰 키워드",
-        "description": "인증 관련 키워드",
+        "description": "인증 관련 키워드 (오탐 빈도 높은 단독 용어 제외)",
         "rule_type": "keyword",
-        "pattern": "API_KEY,ACCESS_TOKEN,SECRET_TOKEN,Bearer,JWT_SECRET,PRIVATE_KEY,SSH_KEY",
+        "pattern": "SECRET_TOKEN,JWT_SECRET,SSH_KEY",
         "service": "all",
         "direction": "both",
     },

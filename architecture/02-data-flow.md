@@ -90,5 +90,6 @@ flowchart TD
 |------|------|------|------|------|
 | 주민등록번호 | regex | `\d{6}-[1-4]\d{6}` | both | 요청: 차단, 응답: 마스킹 |
 | IP 주소 | regex | `\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}` | response | 응답만 마스킹 |
-| 민감 키워드 | keyword | `password,secret,credential,private_key` | both | 요청: 차단, 응답: 마스킹 |
+| 민감 키워드 | keyword | `credential,private_key,비밀번호,passwd` | both | 요청: 차단, 응답: 마스킹 |
+| 자격증명 할당문 | regex | `(?i)(?:password\|token\|secret\|api_key)\s*[=:]\s*\S+` | both | 값 할당 패턴만 탐지 |
 | 내부 도메인 | keyword | `internal.corp.com,admin.local` | response | 응답만 마스킹 |
