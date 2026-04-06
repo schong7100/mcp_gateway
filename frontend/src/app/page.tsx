@@ -39,7 +39,7 @@ const PERIOD_LABELS: Record<string, string> = {
 
 const BAR_COLORS = [
   '#DC2626', '#EA580C', '#D97706',
-  '#0EA5E9', '#0EA5E9', '#0EA5E9',
+  '#1B3F7A', '#1B3F7A', '#1B3F7A',
   '#94A3B8', '#94A3B8', '#94A3B8', '#94A3B8',
 ];
 
@@ -281,7 +281,7 @@ export default function DashboardPage() {
                   tickLine={false}
                 />
                 <Tooltip content={<CustomTooltip unit="건" />} />
-                <Bar dataKey="count" fill="#0EA5E9" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" fill="#1B3F7A" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
